@@ -107,7 +107,6 @@ lists the `LinkCodes` data store. Run it on the VPS: the key is IP-restricted, s
 ### Linking contract
 
 The game's Staff Register terminal (NPC Lab, `NPC_Lab/StaffRegister` in the NPC-Framework repo) and this bot
-
 share one format, set under `link_codes:` in `config/bot.yaml` and pinned by `tests/test_link_codes.py`:
 
 - Codes are 6 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no 0/O, no 1/I). The bot generates them.
