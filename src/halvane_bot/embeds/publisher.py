@@ -1,6 +1,7 @@
 """Post or edit the managed messages on Discord, and remember their ids."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 import discord
@@ -58,15 +59,47 @@ def _embeds(message: dict) -> list[discord.Embed]:
 STYLE = {"primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
          "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger}
 
+log = logging.getLogger(__name__)
+
+
+class ActionButton(discord.ui.Button):
+    """A button whose click runs the handler the bot registered for its custom_id (bot.action_handlers).
+
+    discord.py routes a click to the view it stored for that message before any persistent view, and posting a
+    message with a view stores that view. So every button the bot posts must carry the real behaviour itself.
+    """
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        handlers = getattr(interaction.client, "action_handlers", {})
+        handler = handlers.get(self.custom_id)
+        if handler is None:
+            await interaction.response.send_message("This button is not available right now.", ephemeral=True)
+            return
+        try:
+            await handler(interaction)
+        except Exception:
+            log.exception("button %s failed", self.custom_id)
+            if not interaction.response.is_done():
+                await interaction.response.send_message("Something went wrong; the details are in the bot's log.",
+                                                        ephemeral=True)
+
 
 def message_view(message: dict) -> discord.ui.View | None:
-    """Buttons for a rendered message. Clicks are handled by the persistent view registered for each custom_id."""
+    """Buttons for a rendered message, or None if it has none."""
     buttons = message.get("buttons") or []
     if not buttons:
         return None
     view = discord.ui.View(timeout=None)
     for b in buttons:
-        view.add_item(discord.ui.Button(label=b["label"], style=STYLE[b["style"]], custom_id=b["custom_id"]))
+        view.add_item(ActionButton(label=b["label"], style=STYLE[b["style"]], custom_id=b["custom_id"]))
+    return view
+
+
+def persistent_view(custom_ids: list[str]) -> discord.ui.View:
+    """Registered once at start-up so buttons posted before a restart keep working."""
+    view = discord.ui.View(timeout=None)
+    for cid in custom_ids:
+        view.add_item(ActionButton(label="action", custom_id=cid))
     return view
 
 

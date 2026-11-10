@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Awaitable, Callable
 
 import discord
 from discord.ext import commands
 
 from .config import Settings
-from .embeds.publisher import NO_PINGS
+from .embeds.actions import ACTIONS
+from .embeds.publisher import NO_PINGS, persistent_view
 from .ids import load_ids
 from .roblox.opencloud import OpenCloud
 from .store import Database, EmbedStore, LinkStore
@@ -34,10 +36,12 @@ class HalvaneBot(commands.Bot):
         self.links = LinkStore(self.db)
         self.cloud: OpenCloud | None = None
         self.role_sync: SyncService | None = None
+        # custom_id -> coroutine run when a posted button is clicked (cogs register theirs in cog_load)
+        self.action_handlers: dict[str, Callable[[discord.Interaction], Awaitable[None]]] = {}
 
     async def setup_hook(self) -> None:
         from .cogs.embeds import EmbedsCog
-        from .cogs.verify import VerifyCog, VerifyView
+        from .cogs.verify import VerifyCog
 
         await self.db.open()
         s = self.settings
@@ -51,9 +55,9 @@ class HalvaneBot(commands.Bot):
 
         guild = discord.Object(id=s.guild_id)
         await self.add_cog(EmbedsCog(self), guild=guild)
-        verify = VerifyCog(self)
-        await self.add_cog(verify, guild=guild)
-        self.add_view(VerifyView(verify))  # the Verify button in #verify keeps working after restarts
+        await self.add_cog(VerifyCog(self), guild=guild)
+        # Buttons posted before a restart keep working: one persistent view covers every registered action.
+        self.add_view(persistent_view(list(ACTIONS.values())))
         if s.sync_commands:
             synced = await self.tree.sync(guild=guild)
             log.info("registered %d command(s) in guild %s", len(synced), s.guild_id)

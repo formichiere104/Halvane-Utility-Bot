@@ -32,18 +32,6 @@ CODES_PER_WINDOW = 3
 CODE_WINDOW = 600  # seconds
 
 
-class VerifyView(discord.ui.View):
-    """Persistent handler for the Verify button published in #verify (embeds/verify.yaml)."""
-
-    def __init__(self, cog: VerifyCog) -> None:
-        super().__init__(timeout=None)
-        self.cog = cog
-
-    @discord.ui.button(label="Verify", style=discord.ButtonStyle.primary, custom_id=VERIFY_CUSTOM_ID)
-    async def verify(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self.cog.start_verification(interaction)
-
-
 class VerifyCog(commands.Cog):
     sync_group = app_commands.Group(
         name="sync", description="Staff: sync roles from the Roblox group.",
@@ -56,11 +44,14 @@ class VerifyCog(commands.Cog):
         self.attempts: dict[int, list[float]] = {}
 
     async def cog_load(self) -> None:
+        # The Verify button in #verify (embeds/verify.yaml) runs this.
+        self.bot.action_handlers[VERIFY_CUSTOM_ID] = self.start_verification
         self.sweep_loop.change_interval(minutes=self.bot.settings.sync_interval_minutes)
         self.poll.start()
         self.sweep_loop.start()
 
     async def cog_unload(self) -> None:
+        self.bot.action_handlers.pop(VERIFY_CUSTOM_ID, None)
         self.poll.cancel()
         self.sweep_loop.cancel()
 
