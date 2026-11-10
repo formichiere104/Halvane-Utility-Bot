@@ -132,7 +132,7 @@ def run_link_check(settings: Settings, code: str) -> int:
         print(f"filed {int(time.time() - value['at'])} s ago by this host's clock "
               "(a large negative or very large number means the host clock is off)")
 
-    # The bot itself reads through its async client (aiohttp). Do the same read that way and compare.
+    # Do the same read through the bot's own async client (roblox/opencloud.py) and compare.
     import asyncio
 
     from .roblox.opencloud import OpenCloud, OpenCloudError

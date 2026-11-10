@@ -3,22 +3,26 @@
 
 Key permissions used: group read on the Staff Register; data store read + delete on the game's universe.
 The key is IP-restricted, so this only works from the VPS.
+
+Transport: urllib in a worker thread, not aiohttp. On the VPS every aiohttp request to apis.roblox.com hung
+until its timeout (even IPv4-only), while urllib on the same host answered at once (10 Nov 2026). The bot makes
+a handful of calls a minute, so a thread per call is plenty.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
-import socket
+import urllib.error
 import urllib.parse
+import urllib.request
 from typing import Any
-
-import aiohttp
 
 log = logging.getLogger(__name__)
 
 API = "https://apis.roblox.com"
 RETRY_STATUS = {429, 500, 502, 503, 504}
+TIMEOUT = 15  # seconds per socket operation
 
 
 class OpenCloudError(Exception):
@@ -55,45 +59,41 @@ class OpenCloud:
         self.universe_id = universe_id
         self.group_id = group_id
         self.link_store = link_store
-        self._session: aiohttp.ClientSession | None = None
 
     async def start(self) -> None:
-        if self._session is None:
-            self._session = aiohttp.ClientSession(
-                headers={"x-api-key": self._key, "User-Agent": "halvane-utility-bot"},
-                timeout=aiohttp.ClientTimeout(total=20, sock_connect=8),
-                # IPv4 only. The key's IP restriction names the host's IPv4 address, and on a droplet without a
-                # working IPv6 route aiohttp would try IPv6 first and hang until the timeout (seen 10 Nov 2026:
-                # every read ended in a bare "network error" while urllib on the same host answered at once).
-                connector=aiohttp.TCPConnector(family=socket.AF_INET),
-            )
+        """Nothing to open (kept so callers don't change)."""
 
     async def close(self) -> None:
-        if self._session is not None:
-            await self._session.close()
-            self._session = None
+        """Nothing to close."""
+
+    def _send(self, method: str, url: str) -> tuple[int, str]:
+        """One blocking HTTP call. Runs in a worker thread. Returns (status, body); HTTP errors are not raised."""
+        req = urllib.request.Request(url, method=method,
+                                     headers={"x-api-key": self._key, "User-Agent": "halvane-utility-bot"})
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                return resp.status, resp.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read().decode("utf-8", "replace")
 
     async def _request(self, method: str, path: str, *, allow_404: bool = False) -> dict[str, Any] | None:
-        if self._session is None:
-            await self.start()
-        assert self._session is not None
         for attempt in range(4):
             try:
-                async with self._session.request(method, API + path) as resp:
-                    text = await resp.text()
-                    if resp.status in RETRY_STATUS and attempt < 3:
-                        await asyncio.sleep(min(2 ** attempt, 8))
-                        continue
-                    if resp.status == 404 and allow_404:
-                        return None
-                    if resp.status >= 400:
-                        raise OpenCloudError(resp.status, text[:200])
-                    return json.loads(text) if text.strip() else {}
-            except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+                status, text = await asyncio.to_thread(self._send, method, API + path)
+            except (urllib.error.URLError, OSError, ValueError) as exc:  # DNS, connection, TLS, timeout
                 if attempt == 3:
-                    # A timeout's message is empty, so always name the exception type.
+                    # A timeout's message can be empty, so always name the exception type.
                     raise OpenCloudError(0, f"network error: {type(exc).__name__} {exc}".rstrip()) from None
                 await asyncio.sleep(min(2 ** attempt, 8))
+                continue
+            if status in RETRY_STATUS and attempt < 3:
+                await asyncio.sleep(min(2 ** attempt, 8))
+                continue
+            if status == 404 and allow_404:
+                return None
+            if status >= 400:
+                raise OpenCloudError(status, text[:200])
+            return json.loads(text) if text.strip() else {}
         raise OpenCloudError(0, "gave up after retries")
 
     # ---- account linking (data store written by the game's Staff Register terminal) ----------------
