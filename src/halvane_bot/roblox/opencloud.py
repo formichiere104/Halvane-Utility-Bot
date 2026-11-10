@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import socket
 import urllib.parse
 from typing import Any
 
@@ -60,7 +61,11 @@ class OpenCloud:
         if self._session is None:
             self._session = aiohttp.ClientSession(
                 headers={"x-api-key": self._key, "User-Agent": "halvane-utility-bot"},
-                timeout=aiohttp.ClientTimeout(total=20),
+                timeout=aiohttp.ClientTimeout(total=20, sock_connect=8),
+                # IPv4 only. The key's IP restriction names the host's IPv4 address, and on a droplet without a
+                # working IPv6 route aiohttp would try IPv6 first and hang until the timeout (seen 10 Nov 2026:
+                # every read ended in a bare "network error" while urllib on the same host answered at once).
+                connector=aiohttp.TCPConnector(family=socket.AF_INET),
             )
 
     async def close(self) -> None:
@@ -86,7 +91,8 @@ class OpenCloud:
                     return json.loads(text) if text.strip() else {}
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 if attempt == 3:
-                    raise OpenCloudError(0, f"network error: {exc}") from None
+                    # A timeout's message is empty, so always name the exception type.
+                    raise OpenCloudError(0, f"network error: {type(exc).__name__} {exc}".rstrip()) from None
                 await asyncio.sleep(min(2 ** attempt, 8))
         raise OpenCloudError(0, "gave up after retries")
 
