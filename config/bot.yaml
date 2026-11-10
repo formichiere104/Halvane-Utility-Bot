@@ -18,5 +18,5 @@ log_channel: server_logs
 
 # Links used in embeds as {link:key}. An empty link blocks publishing until it is filled in.
 links:
-  roblox_group: ""   # the Staff Register, e.g. https://www.roblox.com/communities/<id>
-  game: ""           # the experience page
+  roblox_group: "https://www.roblox.com/communities/467115756/Forklift-Certification-Program#!/about"   # the Staff Register, e.g. https://www.roblox.com/communities/<id>
+  game: "https://www.roblox.com/games/88799018873683/NPC-System-Testing"           # the experience page

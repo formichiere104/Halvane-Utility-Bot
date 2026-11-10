@@ -83,7 +83,44 @@ No privileged intents are needed for phase 1.
   Manage Messages, Manage Threads, Manage Roles, Manage Channels, Manage Server. That covers this bot (including
   the role sync of later phases) and the setup MCP, without a leaked token being able to do everything.
 
-## VPS setup (DigitalOcean, Ubuntu 24.04)
+## Running on the VPS in `screen` (next to another bot)
+
+Each bot gets its own folder, virtual environment, `.env` and `screen` session, so they never share packages or
+settings.
+
+```bash
+# 1. One-time setup (as your normal user, in your home folder)
+python3 --version                                  # needs 3.11 or newer
+sudo apt install -y python3-venv git screen        # skip what is already installed
+cd ~
+git clone https://github.com/formichiere104/Halvane-Utility-Bot.git
+cd Halvane-Utility-Bot
+python3 -m venv .venv
+.venv/bin/pip install -e .
+cp .env.example .env && nano .env                  # DISCORD_TOKEN=<GladOS token>
+chmod 600 .env
+.venv/bin/python -m halvane_bot check              # must end with "All good."
+
+# 2. Start it in its own detached screen session
+screen -dmS halvane bash -c 'cd ~/Halvane-Utility-Bot && .venv/bin/python -m halvane_bot run 2>&1 | tee -a bot.log'
+screen -ls                                         # shows "halvane" next to your other bot's session
+
+# Look at it: screen -r halvane      Leave it running: Ctrl+A, then D      Stop it: Ctrl+C inside it
+```
+
+**Updating:**
+
+```bash
+screen -S halvane -X quit                          # stop the bot
+cd ~/Halvane-Utility-Bot && git pull --ff-only
+.venv/bin/pip install -e . && .venv/bin/python -m halvane_bot check
+screen -dmS halvane bash -c 'cd ~/Halvane-Utility-Bot && .venv/bin/python -m halvane_bot run 2>&1 | tee -a bot.log'
+```
+
+`screen` does not restart the bot after a crash or a reboot. Run the start line again by hand, or switch to the
+systemd service below later.
+
+## VPS setup with systemd (alternative)
 
 ```bash
 sudo apt update && sudo apt install -y git python3-venv
@@ -120,10 +157,22 @@ Commit the new `config/ids.yaml`.
 
 ## First run on the server
 
-1. Take over the ranks message GladOS already posted (the YAML is identical to it, so nothing visibly changes):
-   `/embeds adopt ranks-explained 1569723197044170898`
-2. `/embeds list` should show it as "adopted, not published yet". `/embeds publish ranks-explained` then edits it
-   in place and marks it up to date.
-3. Fill `roblox_group` and `game` under `links:` in `config/bot.yaml`, commit, run `deploy/update.sh`.
-4. Preview and publish the rest: `rules`, `welcome`, `how-to-join`, `how-promotion-works`. Each goes into its
-   own channel, which is empty today.
+All five messages were published on 10 Nov 2026 from the dev PC, so their ids live in that PC's
+`data/halvane.db`, not on the VPS. Give them to the VPS bot once, so later publishes edit them instead of
+posting duplicates. Either copy the database before the first start:
+
+```bash
+scp "C:\Users\lucaf\Documents\Halvane Utility Bot\Halvane-Utility-Bot\data\halvane.db" <user>@<vps>:~/Halvane-Utility-Bot/data/
+```
+
+or, once the bot runs, adopt them in Discord:
+
+```
+/embeds adopt key:welcome             message_ids:1569808141044945009
+/embeds adopt key:rules               message_ids:1569808147470876855
+/embeds adopt key:how-to-join         message_ids:1569808154261200947
+/embeds adopt key:ranks-explained     message_ids:1569723197044170898
+/embeds adopt key:how-promotion-works message_ids:1569808171600580720
+```
+
+Then `/embeds publish <key>` for each. Nothing visibly changes, and `/embeds list` shows them as up to date.

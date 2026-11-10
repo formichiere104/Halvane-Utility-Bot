@@ -5,11 +5,11 @@ messages:
       - title: How promotion works
         color: "#3F7FBF"
         description: |
-          Every role has its own ladder and its own quota. Compliance earned in one role counts only toward that role. Each step opens when its gates are met:
+          Every role has its own ladder and its own quota, compliance earned in one role counts only toward that role. Each step opens when its gates are met:
 
-          **Quota** – enough Compliance in that role, earned in game.
+          **Quota** – enough compliance in that role, earned in game.
           **Access** – the Roblox group, and for some steps this server.
-          **Approval** – a staff decision, for the steps below that need one.
+          **Approval** – a staff decision, for the steps that need one.
         fields:
           - name: Probationary Associate to Senior Specialist
             value: Quota only. Your rank goes up in game.
@@ -30,5 +30,6 @@ messages:
               {role:dispatch} {role:training}
               Senior Specialist in Forklift Operations or Provost, then apply in {channel:dispatch_applications} or {channel:instructor_applications}.
           - name: Certifications
-            value: Records on your Personnel File, earned at events in {channel:events}. They never gate a promotion.
-        footer: Approved promotions are announced in #personnel-notices.
+            value: Records on your Personnel File, earned at events in {channel:events}.
+          - name: Announcements
+            value: Approved promotions are announced in {channel:personnel_notices}.
