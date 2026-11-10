@@ -37,13 +37,31 @@ def _get(path: str, key: str) -> tuple[int, dict]:
         return exc.code, body
 
 
+def _get_all(path: str, key: str, field: str, page_size: int) -> tuple[int, list[dict]]:
+    """Follow nextPageToken until the list ends. Open Cloud caps pages (group roles: 20, memberships: 100)."""
+    items: list[dict] = []
+    token = ""
+    for _ in range(100):  # hard stop against a token loop
+        sep = "&" if "?" in path else "?"
+        url = f"{path}{sep}maxPageSize={page_size}" + (f"&pageToken={urllib.parse.quote(token)}" if token else "")
+        status, body = _get(url, key)
+        if status != 200:
+            return status, body if isinstance(body, list) else [body]
+        items += body.get(field, [])
+        token = body.get("nextPageToken") or ""
+        if not token:
+            break
+    return 200, items
+
+
 def run_roblox_check(settings: Settings) -> int:
     key = roblox_api_key()
     failures = 0
 
-    status, body = _get(f"/cloud/v2/groups/{settings.group_id}/roles?maxPageSize=100", key)
+    status, roles = _get_all(f"/cloud/v2/groups/{settings.group_id}/roles", key, "groupRoles", page_size=20)
+    body = roles[0] if status != 200 and roles else {}
     if status == 200:
-        found = {int(r["id"]): r.get("displayName", "?") for r in body.get("groupRoles", [])}
+        found = {int(r["id"]): r.get("displayName", "?") for r in roles}
         print(f"ok    group {settings.group_id}: {len(found)} roles readable")
         if settings.role_map_file:
             rm = load_role_map(settings.role_map_file, load_ids(settings.ids_file))
