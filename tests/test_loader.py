@@ -30,6 +30,19 @@ def test_bad_files_are_rejected(tmp_path, text, problem):
         load_embed_set(write(tmp_path, "bad.yaml", text))
 
 
+def test_buttons(tmp_path):
+    ok = load_embed_set(write(tmp_path, "v.yaml",
+                              "channel: verify\nmessages:\n  - content: hi\n    buttons:\n"
+                              "      - {action: verify, label: Verify}\n"))
+    assert ok.messages[0].buttons == ({"action": "verify", "label": "Verify", "style": "primary"},)
+    with pytest.raises(EmbedSpecError, match="unknown action"):
+        load_embed_set(write(tmp_path, "b.yaml",
+                             "channel: verify\nmessages:\n  - content: hi\n    buttons: [{action: nuke, label: X}]\n"))
+    six = ", ".join(["{action: verify, label: V}"] * 6)
+    with pytest.raises(EmbedSpecError, match="at most"):
+        load_embed_set(write(tmp_path, "c.yaml", f"channel: verify\nmessages:\n  - content: hi\n    buttons: [{six}]\n"))
+
+
 def test_drafts_are_skipped(tmp_path):
     write(tmp_path, "_draft.yaml", "not: valid")
     write(tmp_path, "rules.yaml", "channel: rules\nmessages:\n  - content: hi\n")

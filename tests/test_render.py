@@ -65,6 +65,17 @@ def test_hash_changes_only_when_output_changes(ids, links):
     assert a.content_hash == b.content_hash != c.content_hash
 
 
+def test_buttons_render_and_leave_old_hashes_alone(ids, links):
+    plain = render_set(make_set({"description": "x"}), ids, links)
+    assert "buttons" not in plain.messages[0]  # messages published before buttons existed keep their hash
+    es = EmbedSet(key="t", channel="rules", note="", source=Path("t.yaml"), messages=(
+        MessageSpec(content=None, embeds=({"description": "x"},),
+                    buttons=({"action": "verify", "label": "Verify", "style": "primary"},)),))
+    with_button = render_set(es, ids, links)
+    assert with_button.messages[0]["buttons"] == [{"custom_id": "halvane:verify", "label": "Verify", "style": "primary"}]
+    assert with_button.content_hash != plain.content_hash
+
+
 def test_footer_and_trailing_newlines(ids, links):
     r = render_set(make_set({"description": "text\n\n", "footer": "Motto", "color": "#000001"}), ids, links)
     embed = r.messages[0]["embeds"][0]

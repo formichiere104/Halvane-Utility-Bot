@@ -6,7 +6,7 @@ Plan: `design/unusual-shipping/community/personnel-office-bot-plan.html` in the 
 | Phase | What | Status |
 |---|---|---|
 | 1 | Information messages (embeds) from YAML files, `/embeds` | done |
-| 2 | Account linking with an in-game code, rank sync (the bot owns the synced roles; Bloxlink skipped) | in progress: role map, link-code contract, game terminal, `roblox-check` |
+| 2 | Account linking with an in-game code, rank sync (the bot owns the synced roles; Bloxlink skipped) | **built**: `/verify`, Verify button, `/update`, `/unlink`, `/sync`, sweep |
 | 3 | merged into 2 (Bloxlink was never installed) | – |
 | 4 | Approvals into the game (`/approve`, `/demote`, `/certify`) | planned |
 | 5 | `/file`, `/reference`, game-side role assignment | planned |
@@ -85,9 +85,29 @@ reaches GitHub. There is one file per machine; nothing goes into system environm
 Read-only. Lists the Staff Register's roles (and checks every group role in `config/role_map.yaml` exists) and
 lists the `LinkCodes` data store. Run it on the VPS: the key is IP-restricted, so anywhere else it answers 401.
 
-## Account linking contract (phase 2)
+## Account linking and role sync (phase 2)
+
+| Command | Who | Does |
+|---|---|---|
+| `/verify` or the **Verify** button in #verify | anyone | Private message with a 6-character code (10 minutes). File it at the Staff Register terminal in the game's Lobby; the message updates to "Linked" within seconds. |
+| `/update` | anyone | Re-reads your Roblox group roles and fixes your Discord roles now. |
+| `/unlink` | anyone | Removes the link and every synced role. |
+| `/sync member` / `/sync all` | `sync_managers` | Sync one member, or every linked member (also reloads `role_map.yaml`). |
+
+- Roles come only from `config/role_map.yaml`. The bot adds or removes **only** the 31 roles that file manages;
+  staff, Dept., tier, Restricted and every other role are never touched.
+- A sweep re-syncs every linked member every `sync_interval_minutes` (15). Unlinked members are only synced when
+  they join (they get Unverified) or run `/update`, so roles given by hand to unlinked staff are left alone.
+- If Roblox doesn't answer, nothing changes for that member.
+- Linked members get their Roblox username as nickname (`nickname_format`), except the server owner.
+- One Roblox account belongs to one Discord member; filing a code for an account linked elsewhere moves it.
+- Needs the **Server Members** privileged intent (Developer Portal → Bot) and `ROBLOX_API_KEY` in `.env`.
+  Without the key the bot still runs phase 1, and `/verify` says it is unavailable.
+
+### Linking contract
 
 The game's Staff Register terminal (NPC Lab, `NPC_Lab/StaffRegister` in the NPC-Framework repo) and this bot
+
 share one format, set under `link_codes:` in `config/bot.yaml` and pinned by `tests/test_link_codes.py`:
 
 - Codes are 6 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no 0/O, no 1/I). The bot generates them.

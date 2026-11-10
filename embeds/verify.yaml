@@ -1,0 +1,18 @@
+channel: verify
+note: Account linking panel with the Verify button.
+messages:
+  - embeds:
+      - title: Verify your Roblox account
+        color: "#4F8FD6"
+        description: |
+          Link your Roblox account to unlock the server and receive the roles you hold in the Staff Register.
+
+          **1.** Press **Verify** below. The Recruitment Office gives you a code, visible only to you.
+          **2.** Join the game ({link:game}) and file the code at the **Staff Register** terminal in the Lobby.
+          **3.** Your roles update within seconds. Later changes in the group follow automatically.
+
+          Use `/update` to refresh your roles at any time, or `/unlink` to remove the link.
+    buttons:
+      - action: verify
+        label: Verify
+        style: primary

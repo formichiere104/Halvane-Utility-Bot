@@ -12,18 +12,15 @@ from discord import app_commands
 from discord.ext import commands
 
 from ..embeds.loader import EmbedSet, EmbedSpecError, load_all
-from ..embeds.publisher import NO_PINGS, PublishError, adopt, publish
+from ..embeds.publisher import NO_PINGS, PublishError, adopt, message_view, publish
 from ..embeds.render import Rendered, RenderError, render_set
 from ..ids import IdRegistry, load_ids
+from .common import UserFacingError, has_any_role_key, report_error
 
 if TYPE_CHECKING:
     from ..bot import HalvaneBot
 
 log = logging.getLogger(__name__)
-
-
-class UserFacingError(app_commands.AppCommandError):
-    """Shown to the person who ran the command, as is."""
 
 
 @app_commands.guild_only()
@@ -60,44 +57,21 @@ class EmbedsCog(commands.GroupCog, group_name="embeds",
         return [app_commands.Choice(name=k, value=k) for k in keys if current.lower() in k][:25]
 
     async def _log(self, text: str) -> None:
-        key = self.bot.settings.log_channel
-        if not key:
-            return
-        try:
-            channel = self.bot.get_channel(load_ids(self.bot.settings.ids_file).channel(key))
-            if isinstance(channel, discord.abc.Messageable):
-                await channel.send(text, allowed_mentions=NO_PINGS)
-        except Exception:  # logging must never break the command
-            log.exception("could not write to the log channel")
+        await self.bot.log_line(text)
 
     # ---- access ------------------------------------------------------------------------------------
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         member = interaction.user
-        guild = interaction.guild
-        if guild is None or not isinstance(member, discord.Member):
+        if interaction.guild is None or not isinstance(member, discord.Member):
             raise UserFacingError("Use this in the server.")
-        if member.id == guild.owner_id:
-            return True
-        ids = load_ids(self.bot.settings.ids_file)
-        allowed = {ids.roles[k] for k in self.bot.settings.embed_managers if k in ids.roles}
-        if allowed & {r.id for r in member.roles}:
+        if has_any_role_key(member, self.bot.settings.embed_managers, self.bot.settings.ids_file):
             return True
         raise UserFacingError("Only the Directorate can manage these messages.")
 
     async def cog_app_command_error(self, interaction: discord.Interaction,
                                     error: app_commands.AppCommandError) -> None:
-        if isinstance(error, app_commands.CommandInvokeError):
-            error = error.original  # errors raised inside a command callback arrive wrapped
-        if isinstance(error, UserFacingError):
-            text = str(error)
-        else:
-            log.exception("embeds command failed", exc_info=error)
-            text = "Something went wrong; the details are in the bot's log."
-        if interaction.response.is_done():
-            await interaction.followup.send(text, ephemeral=True)
-        else:
-            await interaction.response.send_message(text, ephemeral=True)
+        await report_error(interaction, error)
 
     # ---- commands ----------------------------------------------------------------------------------
 
@@ -143,8 +117,9 @@ class EmbedsCog(commands.GroupCog, group_name="embeds",
                 header += "\n" + "\n".join(f"⚠ {w}" for w in rendered.warnings)
             content = header + ("\n\n" + msg["content"] if msg["content"] else "")
             embeds = [discord.Embed.from_dict(e) for e in msg["embeds"]]
+            extra = {"view": view} if (view := message_view(msg)) is not None else {}
             send = interaction.followup.send if interaction.response.is_done() else interaction.response.send_message
-            await send(content, embeds=embeds, ephemeral=True, allowed_mentions=NO_PINGS)
+            await send(content, embeds=embeds, ephemeral=True, allowed_mentions=NO_PINGS, **extra)
 
     @app_commands.command(name="publish", description="Post the message, or edit the one already posted.")
     @app_commands.describe(key="Embed file name",

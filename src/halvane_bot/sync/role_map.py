@@ -47,6 +47,12 @@ class RoleMap:
         return frozenset(out)
 
 
+def changes(current: Iterable[int], desired: frozenset[int], managed: frozenset[int]) -> tuple[set[int], set[int]]:
+    """(to add, to remove). Only managed roles are ever touched; anything else the member holds stays."""
+    have = set(current) & managed
+    return set(desired) - have, have - set(desired)
+
+
 def load_role_map(path: Path, ids: IdRegistry) -> RoleMap:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

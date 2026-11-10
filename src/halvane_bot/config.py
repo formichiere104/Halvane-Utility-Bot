@@ -33,6 +33,9 @@ class Settings:
     link_alphabet: str = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     link_length: int = 6
     link_expires_minutes: int = 10
+    sync_managers: tuple[str, ...] = ()
+    sync_interval_minutes: int = 15
+    nickname_format: str = "{username}"
 
 
 def project_root() -> Path:
@@ -90,6 +93,9 @@ def load_settings(root: Path | None = None) -> Settings:
         link_alphabet=str(link.get("alphabet") or "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
         link_length=int(link.get("length") or 6),
         link_expires_minutes=int(link.get("expires_minutes") or 10),
+        sync_managers=tuple(raw.get("sync_managers") or ()),
+        sync_interval_minutes=max(1, int(raw.get("sync_interval_minutes") or 15)),
+        nickname_format=str(raw.get("nickname_format") or ""),
     )
 
 

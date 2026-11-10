@@ -28,6 +28,15 @@ link_codes:
   length: 6
   expires_minutes: 10
 
+# Role sync (phase 2). Role keys allowed to use /sync; the server owner always can.
+sync_managers:
+  - director
+  - deputy_director
+  - associate_deputy_director
+  - assistant_director
+sync_interval_minutes: 15        # sweep of every linked member
+nickname_format: "{username}"    # Roblox username as the Discord nickname; empty = leave nicknames alone
+
 # Channel key where the bot logs what it published. Leave empty to disable.
 log_channel: server_logs
 

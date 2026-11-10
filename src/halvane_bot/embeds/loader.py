@@ -22,8 +22,11 @@ from typing import Any
 
 import yaml
 
+from .actions import ACTIONS, MAX_BUTTONS, MAX_LABEL, STYLES
+
 SET_KEYS = {"channel", "note", "messages"}
-MESSAGE_KEYS = {"content", "embeds"}
+MESSAGE_KEYS = {"content", "embeds", "buttons"}
+BUTTON_KEYS = {"action", "label", "style"}
 EMBED_KEYS = {"title", "description", "color", "url", "footer", "author", "fields", "image", "thumbnail"}
 FIELD_KEYS = {"name", "value", "inline"}
 
@@ -36,6 +39,7 @@ class EmbedSpecError(Exception):
 class MessageSpec:
     content: str | None
     embeds: tuple[dict[str, Any], ...]
+    buttons: tuple[dict[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -74,6 +78,26 @@ def _check_embed(path: Path, where: str, embed: Any) -> dict:
     return embed
 
 
+def _check_buttons(path: Path, where: str, buttons: Any) -> tuple[dict[str, str], ...]:
+    if not isinstance(buttons, list):
+        raise _fail(path, where, "must be a list")
+    if len(buttons) > MAX_BUTTONS:
+        raise _fail(path, where, f"at most {MAX_BUTTONS} buttons")
+    out = []
+    for i, b in enumerate(buttons):
+        b = _check_keys(path, f"{where}[{i}]", b, BUTTON_KEYS)
+        if b.get("action") not in ACTIONS:
+            raise _fail(path, f"{where}[{i}].action", f"unknown action {b.get('action')!r}; known: {sorted(ACTIONS)}")
+        label = str(b.get("label") or "")
+        if not label or len(label) > MAX_LABEL:
+            raise _fail(path, f"{where}[{i}].label", f"1 to {MAX_LABEL} characters")
+        style = str(b.get("style") or "primary")
+        if style not in STYLES:
+            raise _fail(path, f"{where}[{i}].style", f"one of {sorted(STYLES)}")
+        out.append({"action": b["action"], "label": label, "style": style})
+    return tuple(out)
+
+
 def load_embed_set(path: Path) -> EmbedSet:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -99,7 +123,8 @@ def load_embed_set(path: Path) -> EmbedSet:
         if not content and not embeds:
             raise _fail(path, f"messages[{i}]", "needs content or embeds")
         checked = tuple(_check_embed(path, f"messages[{i}].embeds[{j}]", e) for j, e in enumerate(embeds))
-        messages.append(MessageSpec(content=content or None, embeds=checked))
+        buttons = _check_buttons(path, f"messages[{i}].buttons", msg["buttons"]) if "buttons" in msg else ()
+        messages.append(MessageSpec(content=content or None, embeds=checked, buttons=buttons))
 
     return EmbedSet(key=path.stem, channel=channel, note=str(raw.get("note") or ""),
                     messages=tuple(messages), source=path)

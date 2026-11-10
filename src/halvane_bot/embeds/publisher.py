@@ -55,6 +55,21 @@ def _embeds(message: dict) -> list[discord.Embed]:
     return [discord.Embed.from_dict(e) for e in message["embeds"]]
 
 
+STYLE = {"primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
+         "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger}
+
+
+def message_view(message: dict) -> discord.ui.View | None:
+    """Buttons for a rendered message. Clicks are handled by the persistent view registered for each custom_id."""
+    buttons = message.get("buttons") or []
+    if not buttons:
+        return None
+    view = discord.ui.View(timeout=None)
+    for b in buttons:
+        view.add_item(discord.ui.Button(label=b["label"], style=STYLE[b["style"]], custom_id=b["custom_id"]))
+    return view
+
+
 async def publish(bot: discord.Client, store: EmbedStore, rendered: Rendered, prune: bool = False) -> PublishReport:
     if rendered.warnings:
         raise PublishError("fix these first: " + "; ".join(rendered.warnings))
@@ -74,7 +89,7 @@ async def publish(bot: discord.Client, store: EmbedStore, rendered: Rendered, pr
         if i < len(old_ids):
             try:
                 await channel.get_partial_message(old_ids[i]).edit(
-                    content=msg["content"], embeds=_embeds(msg), allowed_mentions=NO_PINGS)
+                    content=msg["content"], embeds=_embeds(msg), view=message_view(msg), allowed_mentions=NO_PINGS)
                 report.edited += 1
                 new_ids.append(old_ids[i])
                 continue
@@ -85,7 +100,11 @@ async def publish(bot: discord.Client, store: EmbedStore, rendered: Rendered, pr
                 raise PublishError(
                     f"can't edit message {old_ids[i]}: {exc.text}. A message can only be edited by the bot "
                     "that posted it; delete it by hand and publish again.") from None
-        sent = await channel.send(content=msg["content"], embeds=_embeds(msg), allowed_mentions=NO_PINGS)
+        view = message_view(msg)
+        if view is None:
+            sent = await channel.send(content=msg["content"], embeds=_embeds(msg), allowed_mentions=NO_PINGS)
+        else:
+            sent = await channel.send(content=msg["content"], embeds=_embeds(msg), view=view, allowed_mentions=NO_PINGS)
         report.created += 1 if i >= len(old_ids) else 0
         new_ids.append(sent.id)
 

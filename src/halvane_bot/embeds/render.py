@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from ..ids import IdRegistry, UnknownIdError
+from .actions import ACTIONS
 from .limits import message_problems
 from .loader import EmbedSet
 
@@ -117,6 +118,9 @@ def render_set(es: EmbedSet, ids: IdRegistry, links: Mapping[str, str]) -> Rende
                 "content": fill(msg.content, ids, links, warnings) if msg.content else None,
                 "embeds": [render_embed(e, ids, links, warnings) for e in msg.embeds],
             }
+            if msg.buttons:  # only present when used, so older messages keep their content hash
+                rendered["buttons"] = [{"custom_id": ACTIONS[b["action"]], "label": b["label"], "style": b["style"]}
+                                       for b in msg.buttons]
         except RenderError as exc:
             raise RenderError(f"{es.key}: message {i + 1}: {exc}") from None
         problems += [f"message {i + 1}: {p}" for p in message_problems(rendered)]
