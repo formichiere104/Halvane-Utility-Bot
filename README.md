@@ -107,7 +107,7 @@ else it answers 401. A `FAIL ... -> add ...` line names the permission to add to
 | Command | Who | Does |
 |---|---|---|
 | `/verify` or the **Verify** button in #verify | anyone | Private message with a 6-character code (10 minutes). File it at the Staff Register terminal in the game's Lobby; the message updates to "Linked" within seconds. |
-| `/update` | anyone | Re-reads your Roblox group roles and fixes your Discord roles now. |
+| `/update` | anyone | Re-reads your Roblox group roles and fixes your Discord roles and your in-game certifications and postings now. |
 | `/unlink` | anyone | Removes the link and every synced role. |
 | `/sync member` / `/sync all` | `sync_managers` | Sync one member, or every linked member (also reloads `role_map.yaml`). |
 
@@ -138,7 +138,7 @@ The Directorate records a decision in Discord; the bot carries it to the group, 
 
 | Command | Does |
 |---|---|
-| `/approve member division rank` | Approves a leadership rank in a division (Team Lead → Station Chief), or **Posting** to unlock the division. Refused if the member already holds that rank or higher there. |
+| `/approve member division rank` | Approves a leadership rank in a division (Team Lead → Station Chief), or **Posting** to unlock the division. Refused if the member already holds that rank or higher there, and in Forklift Operations, Provost, Dispatch and Instructor until the member holds that division's posting. |
 | `/demote member division to` | Lowers the rank in that division, or **None** removes it. Not announced. |
 | `/certify member certification` | Records a certification (Reach Truck, Registry, Instructor Qualified, ...). |
 
@@ -148,8 +148,9 @@ without Manage Server. Divisions, the ladder and certifications live in `config/
 Each command, in order, and nothing is written if a step before the write fails:
 
 1. Checks the member has linked a Roblox account and is in the Staff Register.
-2. Reads the member's entry in the game's `ApprovalLedger` data store, applies the change, writes it back
-   (retried if the game or another command changed it meanwhile).
+2. Reads the member's entry in the game's `ApprovalLedger` data store, takes in certifications and postings
+   given or taken in the group by hand (see below), applies the change, writes it back (retried if another
+   command changed it meanwhile).
 3. Sets group roles: the **grade** role is the member's highest step in any division (the old grade role goes),
    posting and certification roles are only added.
 4. Publishes `{"userId": ..., "kind": "ledger"}` on topic `personnel`, so a live server reloads that player at
@@ -160,10 +161,21 @@ Each command, in order, and nothing is written if a step before the write fails:
 
 Quota is still checked by staff in the ticket: the game has no Compliance or Personnel File yet.
 
+### Certifications and postings follow the group
+
+Staff can also give or take a certification or a posting directly in the Roblox group. The bot copies the
+member's certification and posting roles into the ledger, both ways, and tells live servers:
+
+- at once on `/update`, `/sync member` and when an account is linked;
+- within 15 minutes through the sweep, which only reads the ledger for members whose roles changed.
+
+Leadership ranks are not copied: a grade role in the group doesn't say which division it belongs to, so they
+come only from `/approve` and `/demote`. Each copy is logged in the ledger as `"by": "roblox-group"`.
+
 ### Ledger contract
 
 The game's reader (`NPC_Lab/Personnel/PersonnelLedger` in NPC-Framework) and this bot share one format. Only the
-bot writes it.
+bot writes it. `certifications` and `postings` match the member's group roles; `leadership` is the bot's own.
 
 - Data store `ApprovalLedger`, key = the Roblox user id as a string.
 - Value: `{"v": 1, "leadership": {"<division>": "<step>"}, "grade": "<step>", "postings": ["<division>"],

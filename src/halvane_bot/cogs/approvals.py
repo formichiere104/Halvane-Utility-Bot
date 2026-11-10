@@ -30,7 +30,7 @@ STAFF = discord.Permissions(manage_guild=True)
 class ApprovalsCog(commands.Cog):
     def __init__(self, bot: HalvaneBot) -> None:
         self.bot = bot
-        self.service = ApprovalService(bot)
+        self.service = bot.approvals or ApprovalService(bot)
 
     async def cog_app_command_error(self, interaction: discord.Interaction,
                                     error: app_commands.AppCommandError) -> None:

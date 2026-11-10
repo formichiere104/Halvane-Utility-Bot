@@ -11,7 +11,8 @@ import discord
 
 from ..ids import load_ids
 from ..roblox.opencloud import OpenCloudError
-from .ledger import ApprovalConfig, ApprovalError, Ledger, group_changes, load_approvals, tier_changes
+from .ledger import (ApprovalConfig, ApprovalError, Ledger, group_changes, load_approvals, mirror_group,
+                     mirror_labels, tier_changes)
 
 if TYPE_CHECKING:
     from ..bot import HalvaneBot
@@ -39,10 +40,52 @@ class ApprovalService:
     def __init__(self, bot: HalvaneBot) -> None:
         self.bot = bot
         self.cfg: ApprovalConfig = self.load()
+        # Roblox user id -> the certification and posting group roles the ledger last matched. Lets the 15-minute
+        # sweep skip the ledger read for members whose group roles haven't changed.
+        self._mirrored: dict[int, frozenset[int]] = {}
 
     def load(self) -> ApprovalConfig:
         s = self.bot.settings
         return load_approvals(s.root / "config" / "approvals.yaml", load_ids(s.ids_file))
+
+    def _mirrored_roles(self, have: set[int] | frozenset[int]) -> frozenset[int]:
+        cfg = self.cfg
+        tracked = ({c.group_role for c in cfg.certifications.values()}
+                   | {d.posting_group_role for d in cfg.divisions.values() if d.posting_group_role})
+        return frozenset(set(have) & tracked)
+
+    async def mirror(self, roblox_id: int, have: set[int] | frozenset[int], *, force: bool = False) -> list[str]:
+        """Bring the ledger's certifications and postings in line with the member's group roles and tell live
+        servers. Returns what changed ("+Reach Truck Certified"); [] when nothing did. Raises OpenCloudError."""
+        cloud = self.bot.cloud
+        if cloud is None:
+            return []
+        seen = self._mirrored_roles(have)
+        if not force and self._mirrored.get(roblox_id) == seen:
+            return []
+        key, labels = str(roblox_id), []
+        for attempt in range(WRITE_ATTEMPTS):
+            entry = await cloud.get_entry(self.cfg.ledger_store, key)
+            old = Ledger.from_value(entry.value if entry else None)
+            new = mirror_group(old, have, self.cfg, time.time())
+            if new is None:
+                break
+            try:
+                await cloud.put_entry(self.cfg.ledger_store, key, new.to_value(self.cfg, time.time()),
+                                      user_ids=[roblox_id], etag=entry.etag if entry else None)
+                labels = mirror_labels(old, new, self.cfg)
+                break
+            except OpenCloudError as exc:
+                if exc.status in (409, 412) and attempt < WRITE_ATTEMPTS - 1:
+                    continue
+                raise
+        self._mirrored[roblox_id] = seen
+        if labels:
+            try:
+                await cloud.publish(self.cfg.message_topic, {"userId": roblox_id, "kind": "ledger"})
+            except OpenCloudError as exc:
+                log.warning("live servers not told about %s's group change: %s", roblox_id, exc)
+        return labels
 
     async def apply(self, member: discord.Member, mutate: Callable[[Ledger], Ledger],
                     division: str | None) -> ApplyResult:
@@ -63,7 +106,10 @@ class ApprovalService:
             key = str(link.roblox_id)
             for attempt in range(WRITE_ATTEMPTS):
                 entry = await cloud.get_entry(cfg.ledger_store, key)
-                new = mutate(Ledger.from_value(entry.value if entry else None))
+                current = Ledger.from_value(entry.value if entry else None)
+                # Certifications and postings given or taken in the group by hand count first.
+                current = mirror_group(current, membership.roles, cfg, time.time()) or current
+                new = mutate(current)
                 try:
                     await cloud.put_entry(cfg.ledger_store, key, new.to_value(cfg, time.time()),
                                           user_ids=[link.roblox_id], etag=entry.etag if entry else None)
@@ -82,6 +128,7 @@ class ApprovalService:
             for role_id in sorted(unassign):
                 await cloud.unassign_role(membership, role_id)
                 result.group_unassigned.append(role_id)
+            self._mirrored[link.roblox_id] = self._mirrored_roles((set(membership.roles) | assign) - unassign)
 
             # 3. Live servers re-read this player's ledger.
             try:
@@ -109,5 +156,5 @@ class ApprovalService:
 
         # 5. Grade, posting and certification roles in Discord follow the group.
         if self.bot.role_sync is not None:
-            result.sync = await self.bot.role_sync.sync_member(member)
+            result.sync = await self.bot.role_sync.sync_member(member, ledger=False)  # the ledger is fresh
         return result

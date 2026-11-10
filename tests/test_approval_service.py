@@ -31,6 +31,9 @@ class FakeCloud:
     async def membership(self, user_id):
         return self.membership_value
 
+    async def member_roles(self, user_id):
+        return set(self.membership_value.roles)
+
     async def get_entry(self, store, key):
         v = self.store.get(key)
         return None if v is None else Entry(v, str(self.etag))
@@ -92,13 +95,15 @@ def run(cloud, member, mutate, division, link=True):
 
 
 def test_approve_writes_ledger_sets_group_tier_and_tells_servers():
-    team_lead_grade, controller_grade = 915936116, 917892132
-    cloud = FakeCloud(member_roles={controller_grade, 999}, conflict_once=True)
+    team_lead_grade, controller_grade, dispatch_posting = 915936116, 917892132, 916350119
+    # The Dispatch posting was given in the group by hand: it counts, so the Team Lead approval is allowed.
+    cloud = FakeCloud(member_roles={controller_grade, dispatch_posting, 999}, conflict_once=True)
     member = fake_member([])
     service, result = run(cloud, member, lambda led, cfg: approve(led, cfg, "dispatch", "team_lead", "discord:1", 100),
                           "dispatch")
     value = cloud.store["1069090294"]
     assert value["leadership"] == {"dispatch": "team_lead"} and value["grade"] == "team_lead"
+    assert value["postings"] == ["dispatch"]
     assert cloud.writes == 2                       # first write hit an etag conflict and was redone
     assert cloud.assigned == [team_lead_grade]
     assert cloud.unassigned == [controller_grade]  # the old grade role goes; role 999 is untouched
@@ -134,8 +139,8 @@ def test_missing_permission_is_explained():
 
 
 def test_demote_to_none_writes_and_drops_the_grade_role():
-    team_lead_grade = 915936116
-    cloud = FakeCloud(member_roles={team_lead_grade})
+    team_lead_grade, dispatch_posting = 915936116, 916350119
+    cloud = FakeCloud(member_roles={team_lead_grade, dispatch_posting})
     cloud.store["1069090294"] = {"v": 1, "leadership": {"dispatch": "team_lead"}, "grade": "team_lead",
                                  "postings": ["dispatch"], "certifications": [], "updatedAt": 1, "log": []}
     nco_member = fake_member([])
@@ -147,3 +152,55 @@ def test_demote_to_none_writes_and_drops_the_grade_role():
     assert value["leadership"] == {} and "grade" not in value and value["postings"] == ["dispatch"]
     assert cloud.unassigned == [team_lead_grade]
     assert member.removed == [nco] and member.added == []
+
+
+
+def test_mirror_writes_once_then_skips_until_the_group_changes():
+    reach = 916638147
+    cloud = FakeCloud(member_roles=set())
+    reads = []
+    real_get = cloud.get_entry
+
+    async def counting_get(store, key):
+        reads.append(key)
+        return await real_get(store, key)
+    cloud.get_entry = counting_get
+
+    async def scenario():
+        bot = HalvaneBot(replace(load_settings(), database=Path(tempfile.mkdtemp()) / "t.db"))
+        bot.cloud = cloud
+        service = ApprovalService(bot)
+        first = await service.mirror(1069090294, {reach})
+        again = await service.mirror(1069090294, {reach})              # same group roles: no read at all
+        forced = await service.mirror(1069090294, {reach}, force=True)  # /update reads anyway, finds it matches
+        removed = await service.mirror(1069090294, set())
+        return first, again, forced, removed
+    first, again, forced, removed = asyncio.run(scenario())
+    assert first == ["+Reach Truck Certified"] and again == [] and forced == [] and removed == ["-Reach Truck Certified"]
+    assert len(reads) == 3 and cloud.writes == 2
+    assert cloud.store["1069090294"]["certifications"] == []
+    assert cloud.published == [("personnel", {"userId": 1069090294, "kind": "ledger"})] * 2
+
+
+def test_update_puts_group_certifications_in_game():
+    """/update: a certification given in the Roblox group by hand reaches the ledger and live servers."""
+    from halvane_bot.sync.service import SyncService
+    reach = 916638147
+    cloud = FakeCloud(member_roles={reach})
+    member = fake_member([])
+
+    async def scenario():
+        bot = HalvaneBot(replace(load_settings(), database=Path(tempfile.mkdtemp()) / "t.db"))
+        await bot.db.open()
+        try:
+            await bot.links.link(7, 1069090294, "RedSuix")
+            bot.cloud = cloud
+            bot.approvals = ApprovalService(bot)
+            sync = SyncService(bot, bot.links, cloud)
+            return await sync.sync_member(member, force_ledger=True)
+        finally:
+            await bot.db.close()
+    result = asyncio.run(scenario())
+    assert result.in_game == ["+Reach Truck Certified"] and "in game +Reach Truck Certified" in result.summary()
+    assert cloud.store["1069090294"]["certifications"] == ["reach_truck_certified"]
+    assert cloud.published == [("personnel", {"userId": 1069090294, "kind": "ledger"})]

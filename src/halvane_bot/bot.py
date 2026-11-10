@@ -8,6 +8,7 @@ from typing import Awaitable, Callable
 import discord
 from discord.ext import commands
 
+from .approvals.service import ApprovalService
 from .config import Settings
 from .embeds.actions import ACTIONS
 from .embeds.publisher import NO_PINGS, persistent_view
@@ -36,6 +37,7 @@ class HalvaneBot(commands.Bot):
         self.links = LinkStore(self.db)
         self.cloud: OpenCloud | None = None
         self.role_sync: SyncService | None = None
+        self.approvals: ApprovalService | None = None
         # custom_id -> coroutine run when a posted button is clicked (cogs register theirs in cog_load)
         self.action_handlers: dict[str, Callable[[discord.Interaction], Awaitable[None]]] = {}
 
@@ -52,6 +54,7 @@ class HalvaneBot(commands.Bot):
             await self.cloud.start()
         else:
             log.warning("ROBLOX_API_KEY or roblox ids missing: /verify is off, linked members are not synced")
+        self.approvals = ApprovalService(self)
         self.role_sync = SyncService(self, self.links, self.cloud)
 
         guild = discord.Object(id=s.guild_id)

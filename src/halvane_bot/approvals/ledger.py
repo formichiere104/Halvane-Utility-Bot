@@ -5,18 +5,19 @@ Ledger value stored in the game's ApprovalLedger data store, key = Roblox user i
       "v": 1,
       "leadership": {"forklift_operations": "team_lead"},   # highest approved step per division
       "grade": "team_lead",                                   # highest step in any division (convenience)
-      "postings": ["dispatch"],                               # postings unlocked by approval
-      "certifications": ["reach_truck_certified"],
+      "postings": ["dispatch"],                               # postings held (approved or given in the group)
+      "certifications": ["reach_truck_certified"],            # same
       "updatedAt": 1794350000,
       "log": [{"at": ..., "by": "discord:<id>", "action": "approve", ...}]   # newest last, 50 kept
     }
 The game reads it on join and when a "personnel" message arrives; only the bot and staff tools write it.
+Certifications and postings follow the Roblox group (mirror_group), so staff can also give or take them there.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import yaml
 
@@ -163,6 +164,9 @@ def approve(ledger: Ledger, cfg: ApprovalConfig, division: str, step: str, by: s
         new.postings.append(division)
     else:
         s = _step(cfg, step)
+        if d.posting_group_role is not None and division not in new.postings:
+            raise ApprovalError(f"{d.label} needs its posting first: approve it with rank **Posting**, "
+                                "then the leadership rank.")
         current = new.leadership.get(division)
         if current in cfg.steps and cfg.steps[current].rank >= s.rank:
             raise ApprovalError(f"Already {cfg.steps[current].label} in {d.label}. Use /demote to lower a rank.")
@@ -198,6 +202,46 @@ def certify(ledger: Ledger, cfg: ApprovalConfig, cert: str, by: str, now: float)
     new.certifications.append(cert)
     new.log.append({"at": int(now), "by": by, "action": "certify", "certification": cert})
     return new
+
+
+def mirror_group(ledger: Ledger, have: Iterable[int], cfg: ApprovalConfig, now: float) -> Ledger | None:
+    """Certifications and postings follow the Roblox group, so staff can give or take them there by hand too.
+
+    `have` is every group role the member holds. Keys the config no longer knows are kept. Leadership is never
+    touched: a grade role doesn't say which division it belongs to. Returns the updated ledger, or None when the
+    ledger already matches the group."""
+    roles = set(have)
+    known_posts = {k for k, d in cfg.divisions.items() if d.posting_group_role}
+    certs = ({c for c in ledger.certifications if c not in cfg.certifications}
+             | {k for k, c in cfg.certifications.items() if c.group_role in roles})
+    posts = ({p for p in ledger.postings if p not in known_posts}
+             | {k for k in known_posts if cfg.divisions[k].posting_group_role in roles})
+    old_certs, old_posts = set(ledger.certifications), set(ledger.postings)
+    if certs == old_certs and posts == old_posts:
+        return None
+    new = _copy(ledger)
+    new.certifications, new.postings = sorted(certs), sorted(posts)
+    entry: dict[str, Any] = {"at": int(now), "by": "roblox-group", "action": "group"}
+    added = [f"certification:{c}" for c in sorted(certs - old_certs)] + [f"posting:{p}" for p in sorted(posts - old_posts)]
+    removed = [f"certification:{c}" for c in sorted(old_certs - certs)] + [f"posting:{p}" for p in sorted(old_posts - posts)]
+    if added:
+        entry["added"] = added
+    if removed:
+        entry["removed"] = removed
+    new.log.append(entry)
+    return new
+
+
+def mirror_labels(old: Ledger, new: Ledger, cfg: ApprovalConfig) -> list[str]:
+    """What mirror_group changed, for people: ["+Reach Truck Certified", "-Dispatch posting"]."""
+    def cert(k: str) -> str:
+        return cfg.certifications[k].label if k in cfg.certifications else k
+
+    def post(k: str) -> str:
+        return f"{cfg.divisions[k].label if k in cfg.divisions else k} posting"
+    oc, nc, op, np_ = set(old.certifications), set(new.certifications), set(old.postings), set(new.postings)
+    return ([f"+{cert(k)}" for k in sorted(nc - oc)] + [f"-{cert(k)}" for k in sorted(oc - nc)]
+            + [f"+{post(k)}" for k in sorted(np_ - op)] + [f"-{post(k)}" for k in sorted(op - np_)])
 
 
 # ---- what the ledger means --------------------------------------------------------------------------

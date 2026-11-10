@@ -26,10 +26,12 @@ class SyncResult:
     added: list[discord.Role] = field(default_factory=list)
     removed: list[discord.Role] = field(default_factory=list)
     error: str | None = None
+    in_game: list[str] = field(default_factory=list)  # certifications and postings mirrored into the game
+    in_game_error: str | None = None
 
     @property
     def changed(self) -> bool:
-        return bool(self.added or self.removed)
+        return bool(self.added or self.removed or self.in_game)
 
     def summary(self) -> str:
         parts = []
@@ -37,10 +39,14 @@ class SyncResult:
             parts.append("added " + " ".join(r.mention for r in self.added))
         if self.removed:
             parts.append("removed " + " ".join(r.mention for r in self.removed))
+        if self.in_game:
+            parts.append("in game " + ", ".join(self.in_game))
         if not parts and not self.error:
             parts.append("no changes")
         if self.error:
             parts.append(f"not synced: {self.error}")
+        if self.in_game_error:
+            parts.append(f"game not updated: {self.in_game_error}")
         return "; ".join(parts)
 
 
@@ -64,7 +70,10 @@ class SyncService:
         except (RoleMapError, OSError) as exc:
             log.error("role map not reloaded, keeping the previous one: %s", exc)
 
-    async def sync_member(self, member: discord.Member, *, set_nickname: bool = False) -> SyncResult:
+    async def sync_member(self, member: discord.Member, *, set_nickname: bool = False, ledger: bool = True,
+                          force_ledger: bool = False) -> SyncResult:
+        """Discord roles from the group, then the game's certifications and postings from the group (ledger=False
+        skips that; force_ledger reads the ledger even when the group roles look unchanged since last time)."""
         link = await self.links.by_discord(member.id)
         result = SyncResult(link=link)
         group_roles: set[int] | None = None
@@ -96,6 +105,14 @@ class SyncService:
             result.error = "the bot's role is below a role it has to change"
         except discord.HTTPException as exc:
             result.error = f"Discord refused the change ({exc.status})"
+
+        approvals = self.bot.approvals
+        if ledger and link and group_roles is not None and approvals is not None:
+            try:
+                result.in_game = await approvals.mirror(link.roblox_id, group_roles, force=force_ledger)
+            except OpenCloudError as exc:
+                result.in_game_error = f"Roblox answered HTTP {exc.status}"
+                log.warning("ledger mirror for %s: %s", member, exc)
 
         if set_nickname and link:
             await self._nickname(member, link)

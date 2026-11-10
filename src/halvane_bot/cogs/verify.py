@@ -173,7 +173,7 @@ class VerifyCog(commands.Cog):
 
         guild = self.bot.get_guild(self.bot.settings.guild_id)
         member = guild.get_member(p.discord_id) if guild else None
-        result = await sync.sync_member(member, set_nickname=True) if member else None
+        result = await sync.sync_member(member, set_nickname=True, force_ledger=True) if member else None
         if moved_from and guild and (old := guild.get_member(moved_from)):
             await sync.sync_member(old)
 
@@ -191,7 +191,7 @@ class VerifyCog(commands.Cog):
     async def verify(self, interaction: discord.Interaction) -> None:
         await self.start_verification(interaction)
 
-    @app_commands.command(name="update", description="Update your roles from the Roblox group now.")
+    @app_commands.command(name="update", description="Update your roles (Discord and in game) from the Roblox group now.")
     @app_commands.guild_only()
     @app_commands.checks.cooldown(1, 30)
     async def update(self, interaction: discord.Interaction) -> None:
@@ -199,7 +199,7 @@ class VerifyCog(commands.Cog):
         if not isinstance(member, discord.Member) or self.bot.role_sync is None:
             raise UserFacingError("Use this in the server.")
         await interaction.response.defer(ephemeral=True, thinking=True)
-        result = await self.bot.role_sync.sync_member(member, set_nickname=True)
+        result = await self.bot.role_sync.sync_member(member, set_nickname=True, force_ledger=True)
         head = (f"Linked to **{result.link.roblox_name}**." if result.link
                 else "You are not linked yet: use `/verify` or the Verify button in #verify.")
         if result.link and result.in_group is False:
@@ -238,7 +238,7 @@ class VerifyCog(commands.Cog):
         self._require_manager(interaction)
         await interaction.response.defer(ephemeral=True, thinking=True)
         assert self.bot.role_sync is not None
-        result = await self.bot.role_sync.sync_member(member, set_nickname=True)
+        result = await self.bot.role_sync.sync_member(member, set_nickname=True, force_ledger=True)
         linked = f"linked to **{result.link.roblox_name}** (`{result.link.roblox_id}`)" if result.link else "not linked"
         await interaction.followup.send(f"{member.mention} is {linked}. Roles: {result.summary()}",
                                         ephemeral=True, allowed_mentions=NO_PINGS)
