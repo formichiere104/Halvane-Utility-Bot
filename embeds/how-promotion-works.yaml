@@ -1,0 +1,34 @@
+channel: how_promotion_works
+note: The three gates, and which steps need a request.
+messages:
+  - embeds:
+      - title: How promotion works
+        color: "#3F7FBF"
+        description: |
+          Every role has its own ladder and its own quota. Compliance earned in one role counts only toward that role. Each step opens when its gates are met:
+
+          **Quota** – enough Compliance in that role, earned in game.
+          **Access** – the Roblox group, and for some steps this server.
+          **Approval** – a staff decision, for the steps below that need one.
+        fields:
+          - name: Probationary Associate to Senior Specialist
+            value: Quota only. Your rank goes up in game.
+          - name: Team Lead, Section Chief, Branch Officer
+            value: |
+              {role:team_lead} {role:section_chief} {role:branch_officer}
+              Quota, then a **Promotion Request** ticket in {channel:open_a_ticket}.
+          - name: Senior Branch Officer
+            value: |
+              {role:senior_branch_officer}
+              Quota only.
+          - name: Controller, Station Chief
+            value: |
+              {role:controller} {role:station_chief}
+              Quota surplus, then a **Command Application** ticket in {channel:open_a_ticket}.
+          - name: Dispatch and Training
+            value: |
+              {role:dispatch} {role:training}
+              Senior Specialist in Forklift Operations or Provost, then apply in {channel:dispatch_applications} or {channel:instructor_applications}.
+          - name: Certifications
+            value: Records on your Personnel File, earned at events in {channel:events}. They never gate a promotion.
+        footer: Approved promotions are announced in #personnel-notices.

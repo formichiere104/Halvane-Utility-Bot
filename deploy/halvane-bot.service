@@ -1,0 +1,24 @@
+[Unit]
+Description=Halvane Utility Bot (Discord)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=halvane
+Group=halvane
+WorkingDirectory=/opt/halvane-utility-bot
+EnvironmentFile=/opt/halvane-utility-bot/.env
+ExecStart=/opt/halvane-utility-bot/.venv/bin/python -m halvane_bot run
+Restart=on-failure
+RestartSec=10
+
+# Hardening: the bot only needs to write its SQLite database.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/halvane-utility-bot/data
+
+[Install]
+WantedBy=multi-user.target

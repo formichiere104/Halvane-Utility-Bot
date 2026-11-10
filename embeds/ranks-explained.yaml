@@ -1,0 +1,80 @@
+channel: ranks_explained
+note: Every rank and role, with what it takes. Special divisions stay [REDACTED].
+messages:
+  - embeds:
+      - title: Ranks
+        color: "#4F8FD6"
+        description: |
+          Every role at Halvane is its own career. You hold a rank in each role you have worked, and you can clock in as any role you have unlocked. Ranks from Probationary Associate to Senior Specialist are in your Personnel File in game.
+
+          **Grade** – your highest leadership rank in any role.
+          • {role:station_chief} – Highest player rank. Quota plus surplus after Controller, then an approved Command Application.
+          • {role:controller} – Heads a division. Quota surplus, then an approved Command Application.
+          • {role:senior_branch_officer} – Quota only, after Branch Officer.
+          • {role:branch_officer} – Quota, then a Promotion Request and approval.
+          • {role:section_chief} – Quota, then a Promotion Request and approval.
+          • {role:team_lead} – Quota, then a Promotion Request and approval.
+          • {role:staff_register} – Member of the Roblox group.
+          • {role:verified} – Roblox account linked.
+
+      - title: Postings
+        color: "#E0A43A"
+        description: |
+          Every division you have unlocked. You can hold several at once.
+
+          • {role:records_and_retention} – File-keepers, application via [REDACTED].
+          • {role:dept_22} – [REDACTED]
+          • {role:dept_21} – [REDACTED]
+          • {role:packing} – Open to everyone. Packing and Registry.
+          • {role:facilities} – Open to everyone. Spills, fires and broken equipment.
+          • {role:forklift_operations} – Roblox group, plus Specialist in Packing or Facilities.
+          • {role:provost} – Roblox group, plus Specialist in Packing or Facilities. Inspections and audits.
+          • {role:dispatch} – Senior Specialist in Forklift Operations or Provost, plus an approved application. Work Orders, truck schedules and the Gate.
+          • {role:training} – Senior Specialist in Forklift Operations or Provost, plus an approved application. Certifications and the training course.
+
+      - title: Division leadership
+        color: "#3F7FBF"
+        description: |
+          Leadership inside one division. You can lead one division and work the floor in another.
+
+          **NCO** – Team Lead or Section Chief in that division.
+          {role:packing_nco} {role:facilities_nco} {role:forklift_nco} {role:provost_nco} {role:dispatch_nco} {role:training_nco}
+
+          **Officer** – Branch Officer or Senior Branch Officer in that division.
+          {role:packing_officer} {role:facilities_officer} {role:forklift_officer} {role:provost_officer} {role:dispatch_officer} {role:training_officer}
+
+          **Command** – Controller or Station Chief in that division.
+          {role:packing_command} {role:facilities_command} {role:forklift_command} {role:provost_command} {role:dispatch_command} {role:training_command}
+
+          **Lead** – Team Lead and up in that division.
+          {role:records_and_retention_lead} {role:dept_22_lead} {role:dept_21_lead}
+
+      - title: Qualifications
+        color: "#6FB3AA"
+        description: |
+          Certifications on your Personnel File, obtained by attending events in {channel:events}.
+
+          {role:reach_truck_certified} {role:counterbalance_certified} {role:order_picker_certified} {role:heavy_haul_certified} {role:hazardous_goods_certified} {role:fire_and_spill_response} {role:registry_certified} {role:instructor_qualified}
+
+      - title: Recognition
+        color: "#F2C94C"
+        description: |
+          • {role:employee_of_the_month} – Monthly peer vote among Associates and above.
+          • {role:hall_of_commendations} – Top contributors of the season.
+          • {role:longest_service} – Top 10 of the tenure board.
+          • {role:shareholder} – Owns the Shareholder Pass.
+          • {role:investor} – Donated at least 500 Robux.
+          • {role:content_creator} – Approved content creator.
+
+      - title: Staff
+        color: "#D4AF37"
+        description: |
+          • {role:director} – The Director.
+          • {role:deputy_director} – The Directorate.
+          • {role:associate_deputy_director} – The Directorate.
+          • {role:assistant_director} – The Directorate.
+          • {role:developer} – Development Team.
+          • {role:head_moderator} – Moderation Team.
+          • {role:moderator} – Moderation Team.
+          • {role:trial_moderator} – Moderation Team.
+        footer: Discretion. Delivery. Duty.

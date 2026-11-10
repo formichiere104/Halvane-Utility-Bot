@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "halvane-utility-bot"
+version = "0.1.0"
+description = "Discord utility bot for Halvane Corporation (Unusual Shipping): embeds now, rank sync and approvals later."
+requires-python = ">=3.11"
+dependencies = [
+    "discord.py==2.7.1",
+    "PyYAML==6.0.3",
+    "aiosqlite==0.22.1",
+    "python-dotenv==1.2.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.2.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

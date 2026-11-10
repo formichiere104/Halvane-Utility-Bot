@@ -1,0 +1,4 @@
+# The bot runs on Linux: keep LF line endings in the repository and on checkout.
+* text=auto eol=lf
+*.sh text eol=lf
+*.service text eol=lf

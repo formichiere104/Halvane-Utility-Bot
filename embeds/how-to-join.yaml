@@ -1,0 +1,18 @@
+channel: how_to_join
+note: The four steps to join, and where to go next.
+messages:
+  - embeds:
+      - title: Joining Halvane
+        color: "#4F8FD6"
+        description: |
+          **1. Sign your contract.** Play {link:game} and file Form HC-1 at the Intake Tray in the Lobby. Your first posting is Packing or Facilities.
+          **2. Join the Staff Register.** Our Roblox group: {link:roblox_group}. It opens Forklift Operations, Provost and every rank above Senior Specialist.
+          **3. Verify.** Link your Roblox account in {channel:verify}. Your roles then update by themselves.
+          **4. Choose your notices** in Channels & Roles: announcements, shift calls, events and more.
+        fields:
+          - name: Where to go next
+            value: |
+              {channel:ranks_explained} – every rank and what it takes
+              {channel:how_promotion_works} – how to move up
+              {channel:events} – certifications, Town Halls and Promotion Boards
+              {channel:open_a_ticket} – questions, reports and requests

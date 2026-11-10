@@ -1,0 +1,18 @@
+channel: rules
+note: Server rules (Staff Conduct).
+messages:
+  - embeds:
+      - title: Staff Conduct
+        color: "#B03A3A"
+        description: |
+          **1. Respect.** No harassment, hate speech, slurs or targeted abuse.
+          **2. Platform rules.** Follow Discord's Terms of Service and Community Guidelines, and Roblox's Community Standards.
+          **3. Right channel.** No spam, mass mentions or advertising. Self-promotion only in {channel:media}.
+          **4. Rank is roleplay.** Rank gives authority in game and in division channels. It gives none over these rules: only moderators enforce them.
+          **5. No exploits.** Don't use them, share them or joke about them. Report them privately with a Security Report ticket in {channel:open_a_ticket}.
+          **6. No impersonation** of staff, moderators or other players.
+          **7. Applications and promotions** go through {channel:open_a_ticket}. Don't DM staff for ranks.
+          **8. Spoilers.** Anything found in game goes in {channel:theories}.
+          **9. Nothing is for sale.** Ranks, roles, approvals and access are never sold or traded.
+          **10. Moderators decide.** Disagree with an action? Open an Appeal ticket in {channel:open_a_ticket}.
+        footer: Discretion. Delivery. Duty.
