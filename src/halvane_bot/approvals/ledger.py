@@ -125,11 +125,14 @@ class Ledger:
         )
 
     def to_value(self, cfg: ApprovalConfig, now: float) -> dict[str, Any]:
+        """The data store value. Never contains null (Roblox refuses it): no leadership rank means no "grade"."""
         g = grade(self, cfg)
-        return {"v": LEDGER_VERSION, "leadership": dict(sorted(self.leadership.items())),
-                "grade": g.key if g else None, "postings": sorted(set(self.postings)),
-                "certifications": sorted(set(self.certifications)), "updatedAt": int(now),
-                "log": self.log[-LOG_KEEP:]}
+        value: dict[str, Any] = {"v": LEDGER_VERSION, "leadership": dict(sorted(self.leadership.items()))}
+        if g:
+            value["grade"] = g.key
+        value.update({"postings": sorted(set(self.postings)), "certifications": sorted(set(self.certifications)),
+                      "updatedAt": int(now), "log": self.log[-LOG_KEEP:]})
+        return value
 
 
 def _copy(ledger: Ledger) -> Ledger:
@@ -182,7 +185,7 @@ def demote(ledger: Ledger, cfg: ApprovalConfig, division: str, to: str | None, b
         if current in cfg.steps and s.rank >= cfg.steps[current].rank:
             raise ApprovalError(f"{s.label} is not below the current {cfg.steps[current].label}.")
         new.leadership[division] = s.key
-    new.log.append({"at": int(now), "by": by, "action": "demote", "division": division, "step": to})
+    new.log.append({"at": int(now), "by": by, "action": "demote", "division": division, "step": to or "none"})
     return new
 
 

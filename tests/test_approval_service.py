@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import tempfile
 import types
 from dataclasses import replace
@@ -9,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from halvane_bot.approvals.ledger import ApprovalError, approve
+from halvane_bot.approvals.ledger import ApprovalError, approve, demote
 from halvane_bot.approvals.service import ApprovalService
 from halvane_bot.bot import HalvaneBot
 from halvane_bot.config import load_settings
@@ -36,6 +37,8 @@ class FakeCloud:
 
     async def put_entry(self, store, key, value, *, user_ids=None, etag=None):
         self.writes += 1
+        if "null" in json.dumps(value):  # like Roblox: 400 "Value cannot be null"
+            raise OpenCloudError(400, "Value cannot be null. (Parameter 'value')")
         if self.conflict_once:
             self.conflict_once = False
             raise OpenCloudError(409, "etag mismatch")
@@ -128,3 +131,19 @@ def test_missing_permission_is_explained():
     cloud.put_entry = refused
     with pytest.raises(ApprovalError, match="missing a permission"):
         run(cloud, fake_member([]), lambda led, cfg: approve(led, cfg, "dispatch", "posting", "d", 1), None)
+
+
+def test_demote_to_none_writes_and_drops_the_grade_role():
+    team_lead_grade = 915936116
+    cloud = FakeCloud(member_roles={team_lead_grade})
+    cloud.store["1069090294"] = {"v": 1, "leadership": {"dispatch": "team_lead"}, "grade": "team_lead",
+                                 "postings": ["dispatch"], "certifications": [], "updatedAt": 1, "log": []}
+    nco_member = fake_member([])
+    service, _ = run(cloud, nco_member, lambda led, cfg: led, None)  # load cfg for the tier role id
+    nco = service.cfg.divisions["dispatch"].tier_roles["nco"]
+    member = fake_member([nco])
+    _, result = run(cloud, member, lambda led, cfg: demote(led, cfg, "dispatch", None, "discord:1", 2), "dispatch")
+    value = cloud.store["1069090294"]
+    assert value["leadership"] == {} and "grade" not in value and value["postings"] == ["dispatch"]
+    assert cloud.unassigned == [team_lead_grade]
+    assert member.removed == [nco] and member.added == []

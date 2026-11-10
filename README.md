@@ -166,8 +166,11 @@ The game's reader (`NPC_Lab/Personnel/PersonnelLedger` in NPC-Framework) and thi
 bot writes it.
 
 - Data store `ApprovalLedger`, key = the Roblox user id as a string.
-- Value: `{"v": 1, "leadership": {"<division>": "<step>"}, "grade": "<step>" | null, "postings": ["<division>"],
-  "certifications": ["<key>"], "updatedAt": <unix seconds>, "log": [last 50 changes]}`.
+- Value: `{"v": 1, "leadership": {"<division>": "<step>"}, "grade": "<step>", "postings": ["<division>"],
+  "certifications": ["<key>"], "updatedAt": <unix seconds>, "log": [last 50 changes]}`. `grade` is left out when
+  the member holds no leadership rank.
+- No `null` anywhere in the value: Roblox refuses the write with 400 "Value cannot be null". The client drops
+  nulls before every data store write.
 - The game mirrors it onto the player as `HC_Grade`, `HC_Leadership` (`division=step,...`), `HC_Postings` and
   `HC_Certifications`.
 

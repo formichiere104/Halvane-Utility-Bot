@@ -47,6 +47,15 @@ class Entry:
     etag: str | None
 
 
+def without_nulls(value: Any) -> Any:
+    """A copy of value with every None removed: dict keys dropped, list items skipped."""
+    if isinstance(value, dict):
+        return {k: without_nulls(v) for k, v in value.items() if v is not None}
+    if isinstance(value, (list, tuple)):
+        return [without_nulls(v) for v in value if v is not None]
+    return value
+
+
 def parse_membership(body: dict[str, Any], group_id: int, user_id: int) -> Membership | None:
     """The user's membership in this group from a ListGroupMemberships response. None = not a member."""
     prefix = f"groups/{group_id}/"
@@ -136,8 +145,10 @@ class OpenCloud:
 
     async def put_entry(self, store: str, key: str, value: Any, *, user_ids: list[int] | None = None,
                         etag: str | None = None) -> None:
-        """Replace the entry's value (created if missing). With an etag, Roblox refuses if it changed meanwhile."""
-        body: dict[str, Any] = {"value": value, "users": [f"users/{int(u)}" for u in user_ids or []]}
+        """Replace the entry's value (created if missing). With an etag, Roblox refuses if it changed meanwhile.
+        JSON nulls are dropped first: Roblox answers 400 "Value cannot be null" to a null anywhere inside a value
+        (and Luau has no nil-in-table to read one back as anyway)."""
+        body: dict[str, Any] = {"value": without_nulls(value), "users": [f"users/{int(u)}" for u in user_ids or []]}
         if etag:
             body["etag"] = etag
         await self._request("PATCH", f"{self._store_path(store)}/{urllib.parse.quote(key, safe='')}"

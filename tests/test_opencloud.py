@@ -66,3 +66,12 @@ def test_membership_filter_is_encoded():
     c, calls = client([(200, '{"groupMemberships": []}')])
     assert asyncio.run(c.member_roles(1069090294)) is None
     assert "filter=user%20%3D%3D%20%27users%2F1069090294%27" in calls[0][1]
+
+
+def test_put_entry_drops_nulls():
+    c, calls = client([(200, "{}")])
+    asyncio.run(c.put_entry("ApprovalLedger", "5", {"grade": None, "log": [{"step": None, "at": 1}, None]},
+                            user_ids=[5]))
+    method, url, body = calls[0]
+    assert method == "PATCH" and url.endswith("/ApprovalLedger/entries/5?allowMissing=true")
+    assert body["value"] == {"log": [{"at": 1}]} and body["users"] == ["users/5"]

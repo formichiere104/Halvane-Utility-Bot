@@ -92,3 +92,23 @@ def test_ledger_round_trip(cfg):
     again = Ledger.from_value(value)
     assert again.leadership == led.leadership and again.certifications == led.certifications
     assert Ledger.from_value(None).leadership == {} and Ledger.from_value("junk").postings == []
+
+
+def has_null(value) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, dict):
+        return any(has_null(v) for v in value.values())
+    if isinstance(value, list):
+        return any(has_null(v) for v in value)
+    return False
+
+
+def test_cleared_ledger_has_no_nulls(cfg):
+    """Roblox answers 400 "Value cannot be null" to a null anywhere in a data store value (/demote to None did)."""
+    led = approve(Ledger(), cfg, "dispatch", "team_lead", "d", 1)
+    led = demote(led, cfg, "dispatch", None, "d", 2)
+    value = led.to_value(cfg, 3)
+    assert "grade" not in value and not has_null(value)
+    assert value["log"][-1]["step"] == "none"
+    assert Ledger.from_value(value).leadership == {}
