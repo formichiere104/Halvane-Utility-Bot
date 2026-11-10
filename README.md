@@ -69,16 +69,19 @@ python -m venv .venv
 
 Run `check` and the tests before every commit.
 
-## Discord application
+## Bot account: GladOS
 
-1. In the [Developer Portal](https://discord.com/developers/applications) create an application for this bot
-   (keep the setup bot separate), open **Bot**, reset and copy the token.
-2. Invite it with the scopes `bot` and `applications.commands` and the permissions View Channels, Send Messages,
-   Embed Links and Read Message History:
-   `https://discord.com/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot%20applications.commands&permissions=84992`
-3. Give it the **Bots** role. Its own role must sit under Bots, like Ticket Tool and carl-bot.
-
+The bot runs as **GladOS** (application id `1569664921501831259`), the same bot that built the server. It is
+already in the server with the Bots role, and `/embeds` is registered in the guild (checked 10 Nov 2026).
 No privileged intents are needed for phase 1.
+
+- **One token, two users.** The same token is used by the `discord-setup` MCP server on the dev PC
+  (`.mcp.json` in NPC-Framework, gitignored) and by this bot on the VPS. Two connections at once are fine. If the
+  token is ever reset, update both places.
+- **Administrator.** GladOS's role still has Administrator from the build. Once setup work is finished, replace it
+  in Server Settings → Roles → GladOS with only: View Channels, Send Messages, Embed Links, Read Message History,
+  Manage Messages, Manage Threads, Manage Roles, Manage Channels, Manage Server. That covers this bot (including
+  the role sync of later phases) and the setup MCP, without a leaked token being able to do everything.
 
 ## VPS setup (DigitalOcean, Ubuntu 24.04)
 
@@ -115,8 +118,12 @@ Existing keys are kept by id, so a rename in Discord doesn't break the embeds. N
 from their name (`Packing · NCO` → `packing_nco`; a voice channel that shares a text channel's name ends in `_voice`).
 Commit the new `config/ids.yaml`.
 
-## The ranks message already in #ranks-explained
+## First run on the server
 
-It was posted by the setup bot (GladOS). If this bot runs under GladOS's token, take it over with
-`/embeds adopt ranks-explained 1569723197044170898`. Under its own application it can't edit GladOS's message:
-publish `ranks-explained` to post a fresh copy, then delete the old one by hand.
+1. Take over the ranks message GladOS already posted (the YAML is identical to it, so nothing visibly changes):
+   `/embeds adopt ranks-explained 1569723197044170898`
+2. `/embeds list` should show it as "adopted, not published yet". `/embeds publish ranks-explained` then edits it
+   in place and marks it up to date.
+3. Fill `roblox_group` and `game` under `links:` in `config/bot.yaml`, commit, run `deploy/update.sh`.
+4. Preview and publish the rest: `rules`, `welcome`, `how-to-join`, `how-promotion-works`. Each goes into its
+   own channel, which is empty today.
