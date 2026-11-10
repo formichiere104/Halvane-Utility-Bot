@@ -91,7 +91,9 @@ def assign_keys(items: Iterable[tuple[int, str, str]], existing: Mapping[str, in
             key = f"{base}_{n}"
             n += 1
         result[key] = item_id
-    return result
+    # Same order as Discord lists them, whether a key is old or new, so refreshes give small diffs.
+    position = {item_id: i for i, (item_id, _, _) in enumerate(items)}
+    return dict(sorted(result.items(), key=lambda kv: position.get(kv[1], len(position))))
 
 
 def render_ids_yaml(guild_id: int, roles: dict[str, int], channels: dict[str, int],

@@ -30,7 +30,7 @@ roles:
   dept_22: "1569677236439613480"  # Dept. 22
   dept_21: "1569677237374951506"  # Dept. 21
   dispatch: "1569677239040221286"  # Dispatch
-  training: "1569677240533524490"  # Training
+  training: "1569677240533524490"  # Instructor
   provost: "1569677241758122057"  # Provost
   forklift_operations: "1569677243502829660"  # Forklift Operations
   facilities: "1569677245058912329"  # Facilities
@@ -59,7 +59,7 @@ roles:
   packing_nco: "1569677354521862186"  # Packing · NCO
   sep_qualifications: "1569677430812311673"  # [──── QUALIFICATIONS ────]
   reach_truck_certified: "1569677432351625216"  # Reach Truck Certified
-  counterbalance_certified: "1569677433978748958"  # Counterbalance Certified
+  counterbalance_certified: "1569677433978748958"  # Forklift Certified
   order_picker_certified: "1569677435585175604"  # Order Picker Certified
   heavy_haul_certified: "1569677437066022957"  # Heavy Haul Certified
   hazardous_goods_certified: "1569677438731157534"  # Hazardous Goods Certified
@@ -85,16 +85,54 @@ roles:
   everyone: "1569664645109907456"  # @everyone
 
 channels:
+  cat_reception: "1569677728850911332"  # RECEPTION
+  cat_notice_board: "1569678097589080140"  # NOTICE BOARD
+  cat_common_area: "1569678099346497617"  # COMMON AREA
+  cat_personnel_desk: "1569678100806238208"  # PERSONNEL DESK
+  cat_shift_radio: "1569678101741305888"  # SHIFT RADIO
+  cat_packing: "1569678103448395847"  # PACKING
+  cat_facilities: "1569678105063460944"  # FACILITIES
+  cat_forklift_operations: "1569678106669613126"  # FORKLIFT OPERATIONS
+  cat_provost: "1569678108066582589"  # PROVOST
+  cat_dispatch: "1569678109232472126"  # DISPATCH
+  cat_training: "1569678110821982238"  # TRAINING
+  cat_special_consignments: "1569678112214618194"  # SPECIAL CONSIGNMENTS
+  cat_forklift_intelligence: "1569678113955389460"  # FORKLIFT INTELLIGENCE
+  cat_records_and_retention: "1569678115440164935"  # RECORDS AND RETENTION
+  cat_leadership: "1569678116861780058"  # LEADERSHIP
+  cat_open_tickets: "1569678118208147526"  # OPEN TICKETS
+  cat_directorate: "1569678120003575898"  # DIRECTORATE
   welcome: "1569678422207234148"  # #welcome
+  ch_1_ops: "1569678715699339287"  # Ch. 1 · Ops
   rules: "1569678423889158214"  # #rules
+  team_1: "1569678717519798362"  # Team 1
   verify: "1569678425898356887"  # #verify
+  team_2: "1569678719545507906"  # Team 2
+  opsec_room_voice: "1569680041367969862"  # Opsec Room
   how_to_join: "1569678427680673812"  # #how-to-join
+  team_3: "1569678722930311258"  # Team 3
+  ch_2_packing: "1569679235071606815"  # Ch. 2 · Packing
+  workshop_voice: "1569679251253501992"  # Workshop
+  racking_halls_voice: "1569679259839111252"  # Racking Halls
+  ch_3_provost: "1569679267577598103"  # Ch. 3 · Provost
+  cold_vault: "1569680035869233162"  # Cold Vault
+  archive: "1569680047915278457"  # Archive
   ranks_explained: "1569678429643739187"  # #ranks-explained
+  team_4: "1569678725803413614"  # Team 4
+  briefing_room: "1569680328002375794"  # Briefing Room
   faq: "1569678431573246143"  # #faq
+  ch_9_hr: "1569678727154106486"  # Ch. 9 · HR
+  ch_4_dispatch: "1569679729165074482"  # Ch. 4 · Dispatch
   announcements: "1569678432986734657"  # #announcements
+  classroom: "1569679741512847371"  # Classroom
+  directorate_voice: "1569680340220514354"  # Directorate
   personnel_notices: "1569678435264102482"  # #personnel-notices
+  cafeteria_voice: "1569678710896984227"  # Cafeteria
+  training_course: "1569679743220060243"  # Training Course
   facility_status: "1569678436887175323"  # #facility-status
+  break_room_voice: "1569678712927158282"  # Break Room
   events: "1569678439404019753"  # #events
+  town_hall: "1569722403888570521"  # Town Hall
   maintenance_log: "1569678441320816732"  # #maintenance-log
   cafeteria: "1569678697454375013"  # #cafeteria
   break_room: "1569678698993418371"  # #break-room
@@ -147,41 +185,3 @@ channels:
   ticket_transcripts: "1569680335514374234"  # #ticket-transcripts
   server_logs: "1569680337028780072"  # #server-logs
   dev_chat: "1569680338718957608"  # #dev-chat
-  cat_reception: "1569677728850911332"  # RECEPTION
-  cat_notice_board: "1569678097589080140"  # NOTICE BOARD
-  cat_common_area: "1569678099346497617"  # COMMON AREA
-  cat_personnel_desk: "1569678100806238208"  # PERSONNEL DESK
-  cat_shift_radio: "1569678101741305888"  # SHIFT RADIO
-  cat_packing: "1569678103448395847"  # PACKING
-  cat_facilities: "1569678105063460944"  # FACILITIES
-  cat_forklift_operations: "1569678106669613126"  # FORKLIFT OPERATIONS
-  cat_provost: "1569678108066582589"  # PROVOST
-  cat_dispatch: "1569678109232472126"  # DISPATCH
-  cat_training: "1569678110821982238"  # TRAINING
-  cat_special_consignments: "1569678112214618194"  # SPECIAL CONSIGNMENTS
-  cat_forklift_intelligence: "1569678113955389460"  # FORKLIFT INTELLIGENCE
-  cat_records_and_retention: "1569678115440164935"  # RECORDS AND RETENTION
-  cat_leadership: "1569678116861780058"  # LEADERSHIP
-  cat_open_tickets: "1569678118208147526"  # OPEN TICKETS
-  cat_directorate: "1569678120003575898"  # DIRECTORATE
-  ch_1_ops: "1569678715699339287"  # Ch. 1 · Ops
-  team_1: "1569678717519798362"  # Team 1
-  team_2: "1569678719545507906"  # Team 2
-  opsec_room_voice: "1569680041367969862"  # Opsec Room
-  team_3: "1569678722930311258"  # Team 3
-  ch_2_packing: "1569679235071606815"  # Ch. 2 · Packing
-  workshop_voice: "1569679251253501992"  # Workshop
-  racking_halls_voice: "1569679259839111252"  # Racking Halls
-  ch_3_provost: "1569679267577598103"  # Ch. 3 · Provost
-  cold_vault: "1569680035869233162"  # Cold Vault
-  archive: "1569680047915278457"  # Archive
-  team_4: "1569678725803413614"  # Team 4
-  briefing_room: "1569680328002375794"  # Briefing Room
-  ch_9_hr: "1569678727154106486"  # Ch. 9 · HR
-  ch_4_dispatch: "1569679729165074482"  # Ch. 4 · Dispatch
-  classroom: "1569679741512847371"  # Classroom
-  directorate_voice: "1569680340220514354"  # Directorate
-  cafeteria_voice: "1569678710896984227"  # Cafeteria
-  training_course: "1569679743220060243"  # Training Course
-  break_room_voice: "1569678712927158282"  # Break Room
-  town_hall: "1569722403888570521"  # Town Hall

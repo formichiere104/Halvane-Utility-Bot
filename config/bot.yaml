@@ -13,6 +13,12 @@ embed_managers:
   - associate_deputy_director
   - assistant_director
 
+# Roblox side (phase 2). The game is the NPC test place for now; change these when the real place exists.
+roblox:
+  group_id: 467115756          # the Staff Register
+  universe_id: 10775400484     # NPC System Testing (place 88799018873683)
+role_map_file: config/role_map.yaml
+
 # Channel key where the bot logs what it published. Leave empty to disable.
 log_channel: server_logs
 

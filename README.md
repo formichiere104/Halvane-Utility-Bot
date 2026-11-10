@@ -58,6 +58,24 @@ messages:                        # each item is one Discord message (max 10 embe
 Tokens: `{role:key}`, `{channel:key}`, `{link:key}`. An unknown key or a message over Discord's limits fails
 `check`. An empty link is a warning and blocks publishing until it is filled in `config/bot.yaml`.
 
+## Secrets (.env)
+
+The bot reads `.env` from the repo folder at start-up (next to `.env.example`). It is gitignored, so it never
+reaches GitHub. There is one file per machine; nothing goes into system environment variables.
+
+| Variable | Needed for | Notes |
+|---|---|---|
+| `DISCORD_TOKEN` | running the bot | GladOS's token |
+| `ROBLOX_API_KEY` | phase 2+ | Open Cloud key: group read on 467115756, data store read/list/delete on universe 10775400484 |
+| `SYNC_COMMANDS` | optional | `0` skips re-registering slash commands on start |
+
+- **This PC:** `C:\Users\lucaf\Documents\Halvane Utility Bot\Halvane-Utility-Bot\.env`. Only needed to test
+  Open Cloud calls locally, and the key only answers from IPs allowed on the key: add this PC's public IP
+  to the key while developing, or test on the VPS. Don't run the full bot here while the VPS bot is online, or
+  both will answer slash commands.
+- **VPS:** `~/Halvane-Utility-Bot/.env`. Add the line with `nano`, keep it `chmod 600`, then restart the
+  bot's screen session so it reads the new value.
+
 ## Local development (Windows)
 
 ```bash

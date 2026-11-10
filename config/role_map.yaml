@@ -1,0 +1,61 @@
+# Phase 2: which Discord roles the bot gives, from public Roblox group data.
+# Group role ids come from the Staff Register (group 467115756); Discord role keys from config/ids.yaml.
+# The bot only ever adds or removes roles listed in this file. Everything in `protected` is hand-assigned
+# and `check` fails if a protected key appears in any mapping.
+
+group_id: 467115756
+
+linked: [verified, packing, facilities, sep_postings, sep_qualifications]   # any linked Roblox account
+not_linked: [unverified]                                                      # members with no link
+in_group: [staff_register]                                                    # any membership (base role)
+
+group_roles:
+  # Grade: highest leadership rank in any role (blueprint ranks 110-160)
+  "916388154": {name: Station Chief,         rank: 160, discord: [station_chief, label_high_ranks, sep_grade]}
+  "917892132": {name: Controller,            rank: 150, discord: [controller, label_high_ranks, sep_grade]}
+  "916786190": {name: Senior Branch Officer, rank: 140, discord: [senior_branch_officer, label_managers, sep_grade]}
+  "917502143": {name: Branch Officer,        rank: 130, discord: [branch_officer, label_managers, sep_grade]}
+  "916720147": {name: Section Chief,         rank: 120, discord: [section_chief, label_supervisors, sep_grade]}
+  "915936116": {name: Team Lead,             rank: 110, discord: [team_lead, label_supervisors, sep_grade]}
+
+  # Postings (ranks 57-70). Packing and Facilities come from `linked` above.
+  "916352121": {name: Records and Retention, rank: 70, discord: [records_and_retention]}
+  "916350119": {name: Dispatch,              rank: 60, discord: [dispatch]}
+  "903950001": {name: Instructor,            rank: 59, discord: [training]}            # Training posting
+  "915818129": {name: Provost,               rank: 58, discord: [provost]}
+  "915914176": {name: Forklift Operations,   rank: 57, discord: [forklift_operations]}
+
+  # Certifications (ranks 20-27)
+  "915622204": {name: Instructor Qualified,      rank: 27, discord: [instructor_qualified]}
+  "917888108": {name: Registry Certified,        rank: 26, discord: [registry_certified]}
+  "915914177": {name: Fire and Spill Response,   rank: 25, discord: [fire_and_spill_response]}
+  "916326157": {name: Hazardous Goods Certified, rank: 24, discord: [hazardous_goods_certified]}
+  "916526155": {name: Heavy Haul Certified,      rank: 23, discord: [heavy_haul_certified]}
+  "917600119": {name: Order Picker Certified,    rank: 22, discord: [order_picker_certified]}
+  "903544016": {name: Forklift Certified,        rank: 21, discord: [counterbalance_certified]}
+  "916638147": {name: Reach Truck Certified,     rank: 20, discord: [reach_truck_certified]}
+
+  # Recognition
+  "917504127": {name: Shareholder, rank: 10, discord: [shareholder]}
+
+# Never synced: given by hand only (blueprint section 06). Group roles Director, Deputy Director,
+# Associate Deputy Director, Assistant Director, Developer and Moderator are deliberately not mapped.
+protected:
+  - director
+  - deputy_director
+  - associate_deputy_director
+  - assistant_director
+  - sep_server_team
+  - developer
+  - head_moderator
+  - moderator
+  - trial_moderator
+  - bots
+  - dept_21
+  - dept_22
+  - dept_21_lead
+  - dept_22_lead
+  - records_and_retention_lead
+  - restricted
+  - leave_of_absence
+  - sep_division_leadership

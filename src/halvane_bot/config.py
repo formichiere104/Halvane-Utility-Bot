@@ -26,6 +26,9 @@ class Settings:
     log_channel: str | None
     links: dict[str, str] = field(default_factory=dict)
     sync_commands: bool = True
+    group_id: int = 0
+    universe_id: int = 0
+    role_map_file: Path | None = None
 
 
 def project_root() -> Path:
@@ -54,6 +57,14 @@ def load_settings(root: Path | None = None) -> Settings:
     links = raw.get("links") or {}
     if not isinstance(links, dict):
         raise ConfigError("config/bot.yaml: 'links' must be a mapping")
+    roblox = raw.get("roblox") or {}
+    if not isinstance(roblox, dict):
+        raise ConfigError("config/bot.yaml: 'roblox' must be a mapping")
+    try:
+        group_id = int(roblox.get("group_id") or 0)
+        universe_id = int(roblox.get("universe_id") or 0)
+    except ValueError as exc:
+        raise ConfigError("config/bot.yaml: roblox ids must be numbers") from exc
 
     return Settings(
         root=root,
@@ -65,7 +76,18 @@ def load_settings(root: Path | None = None) -> Settings:
         log_channel=(raw.get("log_channel") or None),
         links={str(k): str(v or "") for k, v in links.items()},
         sync_commands=os.environ.get("SYNC_COMMANDS", "1") != "0",
+        group_id=group_id,
+        universe_id=universe_id,
+        role_map_file=(root / raw["role_map_file"]) if raw.get("role_map_file") else None,
     )
+
+
+def roblox_api_key() -> str:
+    """Open Cloud API key (phase 2+). Restricted by IP on Roblox's side, so it only works from allowed hosts."""
+    key = os.environ.get("ROBLOX_API_KEY", "").strip()
+    if not key:
+        raise ConfigError("ROBLOX_API_KEY is not set (put it in .env on the host)")
+    return key
 
 
 def discord_token() -> str:

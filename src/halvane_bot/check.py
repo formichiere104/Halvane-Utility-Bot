@@ -25,6 +25,20 @@ def run_check(settings: Settings) -> int:
         print(f"ERROR  log_channel: unknown channel key '{settings.log_channel}'")
         errors += 1
 
+    if settings.role_map_file:
+        from .sync.role_map import RoleMapError, load_role_map
+        try:
+            rm = load_role_map(settings.role_map_file, ids)
+            if settings.group_id and rm.group_id != settings.group_id:
+                print(f"ERROR  role_map.yaml is for group {rm.group_id}, bot.yaml says {settings.group_id}")
+                errors += 1
+            else:
+                print(f"ok     role map: {len(rm.group_roles)} group roles -> {len(rm.managed)} managed Discord roles, "
+                      f"{len(rm.protected)} protected")
+        except RoleMapError as exc:
+            print(f"ERROR  {exc}")
+            errors += 1
+
     try:
         sets = load_all(settings.embeds_dir)
     except EmbedSpecError as exc:
