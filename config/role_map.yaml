@@ -9,6 +9,11 @@ linked: [verified, packing, facilities, sep_postings, sep_qualifications]   # an
 not_linked: [unverified]                                                      # members with no link
 in_group: [staff_register]                                                    # any membership (base role)
 
+# Separators the bot keeps in step with the roles under them, whoever gave those roles: held while the member
+# holds any role placed below the separator in Discord's role list (down to the next [separator]), removed when
+# they hold none. Division Leadership covers the tier roles /approve sets and the hand-given leads.
+follow_separators: [sep_division_leadership]
+
 group_roles:
   # Grade: highest leadership rank in any role (blueprint ranks 110-160)
   "916388154": {name: Station Chief,         rank: 160, discord: [station_chief, label_high_ranks, sep_grade]}
@@ -58,4 +63,3 @@ protected:
   - records_and_retention_lead
   - restricted
   - leave_of_absence
-  - sep_division_leadership

@@ -65,7 +65,7 @@ class FakeRole:
 
 
 def fake_member(role_ids):
-    guild = types.SimpleNamespace(get_role=lambda i: FakeRole(i))
+    guild = types.SimpleNamespace(get_role=lambda i: FakeRole(i), roles=[])
     member = types.SimpleNamespace(id=7, display_name="whov2", guild=guild, bot=False,
                                    roles=[FakeRole(i) for i in role_ids], added=[], removed=[])
 

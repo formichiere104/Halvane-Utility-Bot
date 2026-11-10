@@ -112,7 +112,10 @@ else it answers 401. A `FAIL ... -> add ...` line names the permission to add to
 | `/sync member` / `/sync all` | `sync_managers` | Sync one member, or every linked member (also reloads `role_map.yaml`). |
 
 - Roles come only from `config/role_map.yaml`. The bot adds or removes **only** the 31 roles that file manages;
-  staff, Dept., tier, Restricted and every other role are never touched.
+  staff, Dept., tier, Restricted and every other role are never touched by the sync.
+- **Followed separators** (`follow_separators`, now [DIVISION LEADERSHIP]): held while the member holds any role
+  placed under the separator in Discord's role list, down to the next separator, whoever gave that role; removed
+  when they hold none. Checked on every sync and after every approval.
 - A sweep re-syncs every linked member every `sync_interval_minutes` (15). Unlinked members are only synced when
   they join (they get Unverified) or run `/update`, so roles given by hand to unlinked staff are left alone.
 - If Roblox doesn't answer, nothing changes for that member.
@@ -271,17 +274,32 @@ and clone over SSH instead.
 
 **Updating:** `sudo /opt/halvane-utility-bot/deploy/update.sh` (pull, reinstall, check, restart).
 
-## Refreshing role and channel ids
+## When roles or channels change in Discord
 
-After creating or renaming roles or channels:
+The bot never uses names: every file refers to a role or channel by a **key** (`team_lead`, `server_logs`), and
+`config/ids.yaml` maps keys to Discord ids. After any change, refresh it on the PC (it uses `DISCORD_TOKEN` from
+`.env` and only reads Discord, so it is safe while the VPS bot runs):
 
 ```bash
-.venv/bin/python -m halvane_bot export-ids
+.venv/Scripts/python -m halvane_bot export-ids
 ```
 
-Existing keys are kept by id, so a rename in Discord doesn't break the embeds. New roles and channels get a key
-from their name (`Packing · NCO` → `packing_nco`; a voice channel that shares a text channel's name ends in `_voice`).
-Commit the new `config/ids.yaml`.
+It rewrites `ids.yaml`, lists what changed, then runs `check`. Then commit, push, and on the VPS pull and restart
+the bot (the Updating steps above).
+
+| What changed in Discord | What happens | What to do |
+|---|---|---|
+| A role or channel **renamed** | Nothing breaks: the key stays, only the comment in `ids.yaml` changes. Listed as `renamed`. | Commit. A separator must keep its `[` `]` brackets to stay a separator. |
+| A role or channel **created** | Gets a key from its name (`Packing · NCO` → `packing_nco`, `[── X ──]` → `sep_x`). Listed as `new`. | Use the key where it's needed (`role_map.yaml`, `approvals.yaml`, an embed), then commit. A new role placed under [DIVISION LEADERSHIP] is followed by that separator automatically. |
+| A role or channel **deleted** | Its key disappears. Listed as `REMOVED`, and `check` names every file that still uses it. | Remove or replace the key in those files until `check` says All good, then commit. |
+| Roles **reordered** | Nothing in `ids.yaml` changes. The followed separators use the live order. | Nothing. |
+
+Until the refresh, a deleted role is simply skipped by the role sync, and a new one is unknown to the bot.
+Numbered ticket channels (`ticket-0001`, `closed-0002`) are left out (`ids_ignore_channels` in `config/bot.yaml`).
+
+Roblox group roles are referenced by their Roblox id, so renaming one changes nothing. A new group role is added to
+`role_map.yaml` (and `approvals.yaml` if it's a rank, posting or certification) by id; `roblox-check` on the VPS
+confirms every id exists.
 
 ## First run on the server
 

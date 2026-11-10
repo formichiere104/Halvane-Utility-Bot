@@ -11,7 +11,7 @@ import discord
 from ..ids import load_ids
 from ..roblox.opencloud import OpenCloud, OpenCloudError
 from ..store import Link, LinkStore
-from .role_map import RoleMap, RoleMapError, changes, load_role_map
+from .role_map import RoleMap, RoleMapError, changes, load_role_map, separator_changes
 
 if TYPE_CHECKING:
     from ..bot import HalvaneBot
@@ -91,8 +91,14 @@ class SyncService:
             result.in_group = group_roles is not None
 
         desired = self.role_map.desired(link is not None, group_roles)
-        add_ids, remove_ids = changes((r.id for r in member.roles), desired, self.role_map.managed)
+        current = {r.id for r in member.roles}
+        add_ids, remove_ids = changes(current, desired, self.role_map.managed)
         guild = member.guild
+        if self.role_map.follow_separators:
+            server_roles = [(r.id, r.position, r.name) for r in guild.roles if not r.is_default() and not r.managed]
+            sep_add, sep_remove = separator_changes((current - remove_ids) | add_ids, server_roles,
+                                                    self.role_map.follow_separators)
+            add_ids, remove_ids = add_ids | sep_add, remove_ids | sep_remove
         add = [r for i in sorted(add_ids) if (r := guild.get_role(i)) is not None]
         remove = [r for i in sorted(remove_ids) if (r := guild.get_role(i)) is not None]
         try:

@@ -2,7 +2,7 @@
 
     python -m halvane_bot            run the bot (same as `run`)
     python -m halvane_bot check      validate config, ids and embeds offline
-    python -m halvane_bot export-ids write config/ids.yaml from the live server (needs DISCORD_TOKEN)
+    python -m halvane_bot export-ids write config/ids.yaml from the live server, list what changed, then check
     python -m halvane_bot roblox-check  prove the Open Cloud key works from this host (harmless probes only)
     python -m halvane_bot link-check CODE  show what Roblox has filed under one link code (read-only)
 """
@@ -35,10 +35,13 @@ def main(argv: list[str] | None = None) -> int:
             from .roblox_check import run_link_check
             return run_link_check(settings, args.code)
         if args.command == "export-ids":
+            from .check import run_check
             from .export_ids import export_ids
-            path = export_ids(settings)
+            path, report = export_ids(settings)
             print(f"wrote {path}")
-            return 0
+            print("\n".join(report) if report else "no roles or channels were added, renamed or removed")
+            print()
+            return run_check(settings)  # names every file that still uses a removed key
 
         import discord
 

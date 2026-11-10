@@ -156,5 +156,10 @@ class ApprovalService:
 
         # 5. Grade, posting and certification roles in Discord follow the group.
         if self.bot.role_sync is not None:
-            result.sync = await self.bot.role_sync.sync_member(member, ledger=False)  # the ledger is fresh
+            fresh = member
+            try:  # member.roles doesn't show the tier change above yet; the separators depend on it
+                fresh = await member.guild.fetch_member(member.id)
+            except discord.HTTPException:
+                pass
+            result.sync = await self.bot.role_sync.sync_member(fresh, ledger=False)  # the ledger is fresh
         return result

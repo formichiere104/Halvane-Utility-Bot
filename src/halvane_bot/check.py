@@ -21,6 +21,10 @@ def run_check(settings: Settings) -> int:
         if key not in ids.roles:
             print(f"ERROR  embed_managers: unknown role key '{key}'")
             errors += 1
+    for key in settings.sync_managers:
+        if key not in ids.roles:
+            print(f"ERROR  sync_managers: unknown role key '{key}'")
+            errors += 1
     if settings.log_channel and settings.log_channel not in ids.channels:
         print(f"ERROR  log_channel: unknown channel key '{settings.log_channel}'")
         errors += 1
@@ -36,6 +40,21 @@ def run_check(settings: Settings) -> int:
                 print(f"ok     role map: {len(rm.group_roles)} group roles -> {len(rm.managed)} managed Discord roles, "
                       f"{len(rm.protected)} protected")
         except RoleMapError as exc:
+            print(f"ERROR  {exc}")
+            errors += 1
+
+    approvals_file = settings.root / "config" / "approvals.yaml"
+    if approvals_file.exists():
+        from .approvals.ledger import ApprovalConfigError, load_approvals
+        try:
+            cfg = load_approvals(approvals_file, ids)
+            if cfg.notices_channel not in ids.channels:
+                print(f"ERROR  approvals.yaml: unknown channel key '{cfg.notices_channel}'")
+                errors += 1
+            else:
+                print(f"ok     approvals: {len(cfg.divisions)} divisions, {len(cfg.steps)} ranks, "
+                      f"{len(cfg.certifications)} certifications")
+        except ApprovalConfigError as exc:
             print(f"ERROR  {exc}")
             errors += 1
 
