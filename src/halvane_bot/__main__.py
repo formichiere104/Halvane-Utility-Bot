@@ -3,7 +3,7 @@
     python -m halvane_bot            run the bot (same as `run`)
     python -m halvane_bot check      validate config, ids and embeds offline
     python -m halvane_bot export-ids write config/ids.yaml from the live server (needs DISCORD_TOKEN)
-    python -m halvane_bot roblox-check  prove the Open Cloud key works from this host (read-only)
+    python -m halvane_bot roblox-check  prove the Open Cloud key works from this host (harmless probes only)
     python -m halvane_bot link-check CODE  show what Roblox has filed under one link code (read-only)
 """
 from __future__ import annotations

@@ -40,6 +40,7 @@ class HalvaneBot(commands.Bot):
         self.action_handlers: dict[str, Callable[[discord.Interaction], Awaitable[None]]] = {}
 
     async def setup_hook(self) -> None:
+        from .cogs.approvals import ApprovalsCog
         from .cogs.embeds import EmbedsCog
         from .cogs.verify import VerifyCog
 
@@ -56,6 +57,7 @@ class HalvaneBot(commands.Bot):
         guild = discord.Object(id=s.guild_id)
         await self.add_cog(EmbedsCog(self), guild=guild)
         await self.add_cog(VerifyCog(self), guild=guild)
+        await self.add_cog(ApprovalsCog(self), guild=guild)
         # Buttons posted before a restart keep working: one persistent view covers every registered action.
         self.add_view(persistent_view(list(ACTIONS.values())))
         if s.sync_commands:

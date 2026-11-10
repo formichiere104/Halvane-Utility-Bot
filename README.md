@@ -8,7 +8,7 @@ Plan: `design/unusual-shipping/community/personnel-office-bot-plan.html` in the 
 | 1 | Information messages (embeds) from YAML files, `/embeds` | done |
 | 2 | Account linking with an in-game code, rank sync (the bot owns the synced roles; Bloxlink skipped) | **built**: `/verify`, Verify button, `/update`, `/unlink`, `/sync`, sweep |
 | 3 | merged into 2 (Bloxlink was never installed) | – |
-| 4 | Approvals into the game (`/approve`, `/demote`, `/certify`) | planned |
+| 4 | Approvals into the game (`/approve`, `/demote`, `/certify`) | **built**: ledger, group roles, tiers, live servers, notices |
 | 5 | `/file`, `/reference`, game-side role assignment | planned |
 
 ## What phase 1 does
@@ -66,7 +66,7 @@ reaches GitHub. There is one file per machine; nothing goes into system environm
 | Variable | Needed for | Notes |
 |---|---|---|
 | `DISCORD_TOKEN` | running the bot | GladOS's token |
-| `ROBLOX_API_KEY` | phase 2+ | Open Cloud key: group read on 467115756, data store read/list/delete on universe 10775400484 |
+| `ROBLOX_API_KEY` | phase 2+ | Open Cloud key, see [Key permissions](#key-permissions) |
 | `SYNC_COMMANDS` | optional | `0` skips re-registering slash commands on start |
 
 - **This PC:** `C:\Users\lucaf\Documents\Halvane Utility Bot\Halvane-Utility-Bot\.env`. Only needed to test
@@ -76,14 +76,31 @@ reaches GitHub. There is one file per machine; nothing goes into system environm
 - **VPS:** `~/Halvane-Utility-Bot/.env`. Add the line with `nano`, keep it `chmod 600`, then restart the
   bot's screen session so it reads the new value.
 
+### Key permissions
+
+One Open Cloud key (Creator Hub → Open Cloud → API Keys), restricted to the VPS's IPv4 address. It must be owned
+by an account ranked above every group role the bot assigns (the group owner's key is): Roblox only lets a key
+assign roles below its owner's highest role.
+
+| Area | Target | Operations | Used by |
+|---|---|---|---|
+| Groups | Staff Register (467115756) | Read | phase 2: role sync |
+| Groups | Staff Register (467115756) | **Write** | phase 4: group roles on `/approve`, `/demote`, `/certify` |
+| Data stores | experience 10775400484 | Read entry, List entry keys, Delete entry | phase 2: `LinkCodes` |
+| Data stores | experience 10775400484 | **Create entry, Update entry** | phase 4: `ApprovalLedger` |
+| Messaging Service | experience 10775400484 | **Publish** | phase 4: tells live servers to reload a player |
+
 ### Checking the Roblox key
 
 ```bash
 .venv/bin/python -m halvane_bot roblox-check
 ```
 
-Read-only. Lists the Staff Register's roles (and checks every group role in `config/role_map.yaml` exists) and
-lists the `LinkCodes` data store. Run it on the VPS: the key is IP-restricted, so anywhere else it answers 401.
+Checks every permission above from this host and every group role id in `config/role_map.yaml` and
+`config/approvals.yaml`. The only writes are harmless: one probe entry (`halvane-permission-probe`) is written to
+`ApprovalLedger` and deleted again, one message goes to the `halvane-probe` topic no server listens to, and role
+assignment is tried on a membership that doesn't exist. Run it on the VPS: the key is IP-restricted, so anywhere
+else it answers 401. A `FAIL ... -> add ...` line names the permission to add to the key.
 
 ## Account linking and role sync (phase 2)
 
@@ -112,6 +129,47 @@ share one format, set under `link_codes:` in `config/bot.yaml` and pinned by `te
 - Codes are 6 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no 0/O, no 1/I). The bot generates them.
 - The game writes data store `LinkCodes`, key = the code, value = `{ "userId": <number>, "at": <unix seconds> }`.
 - The bot reads the entry, links the accounts if it is younger than `expires_minutes`, then deletes it.
+- Every sweep also deletes entries nobody is waiting for (older than `expires_minutes` + 5 minutes), so the
+  store only ever holds codes in use.
+
+## Approvals (phase 4)
+
+The Directorate records a decision in Discord; the bot carries it to the group, the game and the server.
+
+| Command | Does |
+|---|---|
+| `/approve member division rank` | Approves a leadership rank in a division (Team Lead → Station Chief), or **Posting** to unlock the division. Refused if the member already holds that rank or higher there. |
+| `/demote member division to` | Lowers the rank in that division, or **None** removes it. Not announced. |
+| `/certify member certification` | Records a certification (Reach Truck, Registry, Instructor Qualified, ...). |
+
+Only `sync_managers` (Director to Assistant Director) can run them; the commands are hidden from members
+without Manage Server. Divisions, the ladder and certifications live in `config/approvals.yaml`.
+
+Each command, in order, and nothing is written if a step before the write fails:
+
+1. Checks the member has linked a Roblox account and is in the Staff Register.
+2. Reads the member's entry in the game's `ApprovalLedger` data store, applies the change, writes it back
+   (retried if the game or another command changed it meanwhile).
+3. Sets group roles: the **grade** role is the member's highest step in any division (the old grade role goes),
+   posting and certification roles are only added.
+4. Publishes `{"userId": ..., "kind": "ledger"}` on topic `personnel`, so a live server reloads that player at
+   once; otherwise the game reads the ledger on the next join.
+5. Sets the division's Discord tier role (NCO / Officer / Command).
+6. Syncs the member's Discord roles from the group, as `/update` does.
+7. Posts the notice in #personnel-notices (approvals and certifications) and a line in #server-logs.
+
+Quota is still checked by staff in the ticket: the game has no Compliance or Personnel File yet.
+
+### Ledger contract
+
+The game's reader (`NPC_Lab/Personnel/PersonnelLedger` in NPC-Framework) and this bot share one format. Only the
+bot writes it.
+
+- Data store `ApprovalLedger`, key = the Roblox user id as a string.
+- Value: `{"v": 1, "leadership": {"<division>": "<step>"}, "grade": "<step>" | null, "postings": ["<division>"],
+  "certifications": ["<key>"], "updatedAt": <unix seconds>, "log": [last 50 changes]}`.
+- The game mirrors it onto the player as `HC_Grade`, `HC_Leadership` (`division=step,...`), `HC_Postings` and
+  `HC_Certifications`.
 
 ## Local development (Windows)
 
@@ -133,10 +191,10 @@ No privileged intents are needed for phase 1.
 - **One token, two users.** The same token is used by the `discord-setup` MCP server on the dev PC
   (`.mcp.json` in NPC-Framework, gitignored) and by this bot on the VPS. Two connections at once are fine. If the
   token is ever reset, update both places.
-- **Administrator.** GladOS's role still has Administrator from the build. Once setup work is finished, replace it
-  in Server Settings → Roles → GladOS with only: View Channels, Send Messages, Embed Links, Read Message History,
-  Manage Messages, Manage Threads, Manage Roles, Manage Channels, Manage Server. That covers this bot (including
-  the role sync of later phases) and the setup MCP, without a leaked token being able to do everything.
+- **Administrator.** GladOS keeps Administrator (owner's decision, 10 Nov 2026): it is the owner's own bot and
+  will do more than this project. That makes the token as powerful as the owner's account, so keep it only in
+  the two `.env`/`.mcp.json` files and reset it at once if it is ever exposed.
+- **Role order.** GladOS's role must stay above every role it syncs or tiers, or Discord refuses the change.
 
 ## Running on the VPS in `screen` (next to another bot)
 

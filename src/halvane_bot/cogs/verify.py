@@ -264,9 +264,35 @@ class VerifyCog(commands.Cog):
     async def sweep_loop(self) -> None:
         if self.bot.role_sync is None:
             return
-        checked, changed, errors = await self.bot.role_sync.sweep()
-        if changed or errors:
-            log.info("sweep: %d checked, %d changed, %d errors", checked, changed, errors)
+        try:
+            checked, changed, errors = await self.bot.role_sync.sweep()
+            if changed or errors:
+                log.info("sweep: %d checked, %d changed, %d errors", checked, changed, errors)
+            await self.cleanup_link_codes()
+        except Exception:
+            log.exception("sweep failed")
+
+    async def cleanup_link_codes(self) -> int:
+        """Delete LinkCodes entries nobody is waiting for: older than a code's lifetime plus five minutes and not
+        pending here. Keeps the data store holding only codes in use. Returns how many were removed."""
+        cloud = self.bot.cloud
+        if cloud is None:
+            return 0
+        active = {p.code for p, _ in self.pending.values()}
+        max_age = self.bot.settings.link_expires_minutes * 60 + 300
+        removed = 0
+        for code in await cloud.list_entry_ids(cloud.link_store):
+            if code in active:
+                continue
+            value = await cloud.get_link_entry(code)
+            at = value.get("at") if isinstance(value, dict) else None
+            if isinstance(at, (int, float)) and not isinstance(at, bool) and time.time() - at < max_age:
+                continue  # filed moments ago; its code may still be claimed
+            await cloud.delete_link_entry(code)
+            removed += 1
+        if removed:
+            log.info("removed %d unused link code(s)", removed)
+        return removed
 
     @sweep_loop.before_loop
     async def _before_sweep(self) -> None:

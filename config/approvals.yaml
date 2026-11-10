@@ -1,0 +1,37 @@
+# Phase 4: approvals. Staff record a decision with /approve, /demote or /certify; the bot writes it to the
+# game's ApprovalLedger data store (key = Roblox user id), sets group roles, sets the Discord division tier,
+# tells live servers, syncs the member and posts the notice.
+# Group role ids are the Staff Register's (group 467115756); Discord role keys come from config/ids.yaml.
+
+ledger_store: ApprovalLedger
+message_topic: personnel          # MessagingService topic live servers subscribe to
+notices_channel: personnel_notices
+
+# Divisions that have a leadership ladder. Hidden divisions are hand-assigned and not listed.
+divisions:
+  packing:             {label: Packing,             posting_group_role: null,      tiers: {nco: packing_nco, officer: packing_officer, command: packing_command}}
+  facilities:          {label: Facilities,          posting_group_role: null,      tiers: {nco: facilities_nco, officer: facilities_officer, command: facilities_command}}
+  forklift_operations: {label: Forklift Operations, posting_group_role: 915914176, tiers: {nco: forklift_nco, officer: forklift_officer, command: forklift_command}}
+  provost:             {label: Provost,             posting_group_role: 915818129, tiers: {nco: provost_nco, officer: provost_officer, command: provost_command}}
+  dispatch:            {label: Dispatch,            posting_group_role: 916350119, tiers: {nco: dispatch_nco, officer: dispatch_officer, command: dispatch_command}}
+  training:            {label: Instructor,          posting_group_role: 903950001, tiers: {nco: training_nco, officer: training_officer, command: training_command}}
+
+# The leadership ladder, lowest first (Game Plan section 03, steps 6 to 11). The grade group role is the member's
+# highest step in any division; the tier is set per division.
+steps:
+  - {key: team_lead,             label: Team Lead,             grade_group_role: 915936116, tier: nco}
+  - {key: section_chief,         label: Section Chief,         grade_group_role: 916720147, tier: nco}
+  - {key: branch_officer,        label: Branch Officer,        grade_group_role: 917502143, tier: officer}
+  - {key: senior_branch_officer, label: Senior Branch Officer, grade_group_role: 916786190, tier: officer}
+  - {key: controller,            label: Controller,            grade_group_role: 917892132, tier: command}
+  - {key: station_chief,         label: Station Chief,         grade_group_role: 916388154, tier: command}
+
+certifications:
+  reach_truck_certified:     {label: Reach Truck Certified,     group_role: 916638147}
+  counterbalance_certified:  {label: Forklift Certified,        group_role: 903544016}
+  order_picker_certified:    {label: Order Picker Certified,    group_role: 917600119}
+  heavy_haul_certified:      {label: Heavy Haul Certified,      group_role: 916526155}
+  hazardous_goods_certified: {label: Hazardous Goods Certified, group_role: 916326157}
+  fire_and_spill_response:   {label: Fire and Spill Response,   group_role: 915914177}
+  registry_certified:        {label: Registry Certified,        group_role: 917888108}
+  instructor_qualified:      {label: Instructor Qualified,      group_role: 915622204}

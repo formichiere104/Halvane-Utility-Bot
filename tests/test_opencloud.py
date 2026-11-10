@@ -21,8 +21,8 @@ def client(responses):
     c = OpenCloud("key", 10775400484, 467115756, "LinkCodes")
     calls = []
 
-    def fake_send(method, url):
-        calls.append((method, url))
+    def fake_send(method, url, body=None):
+        calls.append((method, url) if body is None else (method, url, body))
         r = responses.pop(0)
         if isinstance(r, Exception):
             raise r

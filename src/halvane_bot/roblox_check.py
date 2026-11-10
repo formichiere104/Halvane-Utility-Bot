@@ -1,7 +1,10 @@
-"""`python -m halvane_bot roblox-check`: prove the Open Cloud key works from this host, read-only.
+"""`python -m halvane_bot roblox-check`: prove the Open Cloud key works from this host.
 
-1. Lists the Staff Register's roles and checks every group role id in config/role_map.yaml exists.
-2. Lists one entry of the LinkCodes data store (works on an empty store too).
+1. Lists the Staff Register's roles and checks every group role id in role_map.yaml and approvals.yaml exists.
+2. LinkCodes: list, read and delete (read and delete are probed on a key that never exists).
+3. Approvals (Phase 4): writes one probe entry to the ApprovalLedger and deletes it again, publishes one
+   message to a topic no game server listens to, and probes group role assignment on a membership that
+   doesn't exist. Nothing reaches a player, a member or a live server.
 Run it on the VPS: the key is IP-restricted, so from any other machine it answers 401.
 """
 from __future__ import annotations
@@ -25,15 +28,21 @@ HINTS = {
 
 
 PROBE_KEY = "halvane-permission-probe-never-written"
+WRITE_PROBE_KEY = "halvane-permission-probe"  # never a user id, so the game never reads it
+PROBE_TOPIC = "halvane-probe"                # no game server subscribes to it
 
 
 def _get(path: str, key: str) -> tuple[int, dict]:
     return _call("GET", path, key)
 
 
-def _call(method: str, path: str, key: str) -> tuple[int, dict]:
-    req = urllib.request.Request(API + path, method=method,
-                                 headers={"x-api-key": key, "User-Agent": "halvane-utility-bot"})
+def _call(method: str, path: str, key: str, body: dict | None = None) -> tuple[int, dict]:
+    headers = {"x-api-key": key, "User-Agent": "halvane-utility-bot"}
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode()
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(API + path, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             return resp.status, json.loads(resp.read() or b"{}")
@@ -79,6 +88,13 @@ def run_roblox_check(settings: Settings) -> int:
                 print(f"FAIL  role_map.yaml names group roles that don't exist: {missing}")
             else:
                 print(f"ok    all {len(rm.group_roles)} mapped group roles exist")
+        approval_roles = _approval_group_roles(settings)
+        missing = sorted(gid for gid in approval_roles if gid not in found)
+        if missing:
+            failures += 1
+            print(f"FAIL  approvals.yaml names group roles that don't exist: {missing}")
+        else:
+            print(f"ok    all {len(approval_roles)} group roles in approvals.yaml exist")
     else:
         failures += 1
         print(f"FAIL  group roles: HTTP {status}: {HINTS.get(status, body)}")
@@ -104,8 +120,77 @@ def run_roblox_check(settings: Settings) -> int:
             print(f"FAIL  {what} in '{settings.link_store}': HTTP {status}: {HINTS.get(status, body)}"
                   + ("  -> add this operation to the key's data store permissions" if status == 403 else ""))
 
+    failures += _check_approvals(settings, key)
+
     print("\n" + ("Open Cloud access works." if not failures else f"{failures} check(s) failed."))
     return 1 if failures else 0
+
+
+def _approvals(settings: Settings):
+    from .approvals.ledger import load_approvals
+    return load_approvals(settings.root / "config" / "approvals.yaml", load_ids(settings.ids_file))
+
+
+def _approval_group_roles(settings: Settings) -> set[int]:
+    cfg = _approvals(settings)
+    roles = {s.grade_group_role for s in cfg.steps.values()}
+    roles |= {c.group_role for c in cfg.certifications.values()}
+    roles |= {d.posting_group_role for d in cfg.divisions.values() if d.posting_group_role}
+    return roles
+
+
+def _fail(what: str, status: int, body: dict, fix: str) -> int:
+    print(f"FAIL  {what}: HTTP {status}: {HINTS.get(status, body)}" + (f"  -> {fix}" if status == 403 else ""))
+    return 1
+
+
+def _check_approvals(settings: Settings, key: str) -> int:
+    """Phase 4: the ledger write, the live-server message and group role assignment."""
+    cfg = _approvals(settings)
+    failures = 0
+
+    store = urllib.parse.quote(cfg.ledger_store, safe="")
+    entry = f"/cloud/v2/universes/{settings.universe_id}/data-stores/{store}/entries/{WRITE_PROBE_KEY}"
+    status, body = _call("PATCH", entry + "?allowMissing=true", key, {"value": {"probe": True}})
+    if status == 200:
+        print(f"ok    the key may write entries in '{cfg.ledger_store}'")
+        status, body = _call("GET", entry, key)
+        if status == 200:
+            print(f"ok    the key may read entries in '{cfg.ledger_store}'")
+        else:
+            failures += _fail(f"reading '{cfg.ledger_store}'", status, body,
+                              "add Read entry to the key's data store permissions")
+        status, body = _call("DELETE", entry, key)
+        if status in (200, 404):
+            print("ok    probe entry removed")
+        else:
+            print(f"note  could not remove the probe entry (HTTP {status}); it is harmless: "
+                  f"key '{WRITE_PROBE_KEY}' is never a user id")
+    else:
+        failures += _fail(f"writing '{cfg.ledger_store}'", status, body,
+                          "add Create entry and Update entry to the key's data store permissions")
+
+    status, body = _call("POST", f"/cloud/v2/universes/{settings.universe_id}:publishMessage", key,
+                         {"topic": PROBE_TOPIC, "message": "probe"})
+    if status == 200:
+        print("ok    the key may publish to live servers (Messaging Service)")
+    else:
+        failures += _fail("publishing a message", status, body,
+                          "add Messaging Service > Publish for this experience to the key")
+
+    # A membership id that can't exist: a key with group write gets "not found" or "invalid";
+    # one without it gets 403. Nobody's roles change either way.
+    lowest = cfg.step_list()[0].grade_group_role
+    status, body = _call("POST", f"/cloud/v2/groups/{settings.group_id}/memberships/{WRITE_PROBE_KEY}:assignRole",
+                         key, {"role": f"groups/{settings.group_id}/roles/{lowest}"})
+    if status in (400, 404):
+        print(f"ok    the key may assign group roles (Roblox refused the dummy membership: HTTP {status})")
+    elif status in (401, 403):
+        failures += _fail("assigning group roles", status, body,
+                          "add Groups > Write for the Staff Register to the key")
+    else:
+        print(f"note  group role assignment probe answered HTTP {status}; /approve will show the real answer")
+    return failures
 
 
 def run_link_check(settings: Settings, code: str) -> int:
