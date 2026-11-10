@@ -131,4 +131,22 @@ def run_link_check(settings: Settings, code: str) -> int:
     if isinstance(value, dict) and isinstance(value.get("at"), (int, float)):
         print(f"filed {int(time.time() - value['at'])} s ago by this host's clock "
               "(a large negative or very large number means the host clock is off)")
+
+    # The bot itself reads through its async client (aiohttp). Do the same read that way and compare.
+    import asyncio
+
+    from .roblox.opencloud import OpenCloud, OpenCloudError
+
+    async def bot_read():
+        cloud = OpenCloud(key, settings.universe_id, settings.group_id, settings.link_store)
+        try:
+            return await cloud.get_link_entry(code)
+        finally:
+            await cloud.close()
+
+    try:
+        bot_value = asyncio.run(bot_read())
+        print(f"bot's client read: {bot_value!r}" + ("  (matches)" if bot_value == value else "  (DIFFERENT)"))
+    except OpenCloudError as exc:
+        print(f"bot's client read failed: {exc}")
     return 0

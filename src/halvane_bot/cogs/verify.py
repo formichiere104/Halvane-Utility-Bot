@@ -42,6 +42,7 @@ class VerifyCog(commands.Cog):
         self.bot = bot
         self.pending: dict[int, tuple[PendingCode, discord.Interaction]] = {}
         self.attempts: dict[int, list[float]] = {}
+        self.checks: dict[str, int] = {}  # code -> how often it has been looked up (for log pacing)
 
     async def cog_load(self) -> None:
         # The Verify button in #verify (embeds/verify.yaml) runs this.
@@ -102,47 +103,63 @@ class VerifyCog(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def poll(self) -> None:
-        cloud = self.bot.cloud
-        if cloud is None or not self.pending:
+        if self.bot.cloud is None or not self.pending:
             return
-        now = time.time()
         for uid, (p, interaction) in list(self.pending.items()):
-            if now > p.expires_at + 5:
+            # Anything unexpected is logged here: some network errors would otherwise make discord.py's
+            # task loop retry silently, which is exactly how a stuck link looks from outside.
+            try:
+                await self._check(uid, p, interaction)
+            except Exception:
+                log.exception("link-code check for %s failed", p.code)
+
+    async def _check(self, uid: int, p: PendingCode, interaction: discord.Interaction) -> None:
+        cloud = self.bot.cloud
+        assert cloud is not None
+        now = time.time()
+        if now > p.expires_at + 5:
+            if self.pending.get(uid, (None,))[0] is p:
+                del self.pending[uid]
+            log.info("link code %s expired without being filed", p.code)
+            await self._edit(interaction, "Code expired", "That code expired. Run `/verify` for a new one.", GREY)
+            return
+        checks = self.checks[p.code] = self.checks.get(p.code, 0) + 1
+        try:
+            value = await cloud.get_link_entry(p.code)
+        except OpenCloudError as exc:
+            if exc.status in (401, 403):
+                # The key can't read entries: waiting won't help, so say so instead of going quiet.
+                log.error("LinkCodes read refused: %s", exc)
                 if self.pending.get(uid, (None,))[0] is p:
                     del self.pending[uid]
-                await self._edit(interaction, "Code expired", "That code expired. Run `/verify` for a new one.", GREY)
-                continue
-            try:
-                value = await cloud.get_link_entry(p.code)
-            except OpenCloudError as exc:
-                if exc.status in (401, 403):
-                    # The key can't read entries: waiting won't help, so say so instead of going quiet.
-                    log.error("LinkCodes read refused: %s", exc)
-                    if self.pending.get(uid, (None,))[0] is p:
-                        del self.pending[uid]
-                    await self._edit(interaction, "Not linked",
-                                     "The Recruitment Office can't read the register right now. Staff have been "
-                                     "told; please try again later.", GREY)
-                    await self.bot.log_line(f"Linking failed: Roblox refused to read LinkCodes ({exc}). "
-                                            "Run `roblox-check` on the host.")
-                else:
-                    log.warning("reading link code failed (will retry): %s", exc)
-                continue
-            if value is None:
-                continue
-            roblox_id, reason = filed_user(value, p)
-            if roblox_id is None:
-                log.warning("ignoring LinkCodes entry %s: %s (value %r, code issued at %d)",
-                            p.code, reason, value, int(p.created_at))
-                continue
-            if self.pending.get(uid, (None,))[0] is not p:
-                continue  # replaced by a newer code meanwhile
-            del self.pending[uid]
-            await self._complete(p, roblox_id, interaction)
+                await self._edit(interaction, "Not linked",
+                                 "The Recruitment Office can't read the register right now. Staff have been "
+                                 "told; please try again later.", GREY)
+                await self.bot.log_line(f"Linking failed: Roblox refused to read LinkCodes ({exc}). "
+                                        "Run `roblox-check` on the host.")
+            else:
+                log.warning("reading link code %s failed (will retry): %s", p.code, exc)
+            return
+        if value is None:
+            if checks == 1 or checks % 12 == 0:  # first check, then once a minute
+                log.info("link code %s: nothing filed yet (check %d)", p.code, checks)
+            return
+        log.info("link code %s: found %r", p.code, value)
+        roblox_id, reason = filed_user(value, p)
+        if roblox_id is None:
+            log.warning("ignoring LinkCodes entry %s: %s (value %r, code issued at %d)",
+                        p.code, reason, value, int(p.created_at))
+            return
+        if self.pending.get(uid, (None,))[0] is not p:
+            return  # replaced by a newer code meanwhile
+        del self.pending[uid]
+        self.checks.pop(p.code, None)
+        await self._complete(p, roblox_id, interaction)
 
     @poll.before_loop
     async def _before_poll(self) -> None:
         await self.bot.wait_until_ready()
+        log.info("link-code poll running every 5 s")
 
     async def _complete(self, p: PendingCode, roblox_id: int, interaction: discord.Interaction) -> None:
         cloud, sync = self.bot.cloud, self.bot.role_sync
