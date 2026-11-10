@@ -37,6 +37,17 @@ def parse_member_roles(body: dict[str, Any], group_id: int, user_id: int) -> set
     return None
 
 
+def entry_value(body: dict[str, Any]) -> Any:
+    """The stored value of a GetDataStoreEntry response. Tolerates the value arriving as a JSON string."""
+    value = body.get("value")
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    return value
+
+
 class OpenCloud:
     def __init__(self, api_key: str, universe_id: int, group_id: int, link_store: str) -> None:
         self._key = api_key
@@ -88,7 +99,7 @@ class OpenCloud:
     async def get_link_entry(self, code: str) -> Any | None:
         """The value the game stored for this code ({userId, at}), or None if nothing is filed yet."""
         body = await self._request("GET", self._entry_path(code), allow_404=True)
-        return None if body is None else body.get("value")
+        return None if body is None else entry_value(body)
 
     async def delete_link_entry(self, code: str) -> None:
         await self._request("DELETE", self._entry_path(code), allow_404=True)

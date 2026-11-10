@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from halvane_bot.roblox.opencloud import parse_member_roles
+from halvane_bot.roblox.opencloud import entry_value, parse_member_roles
 from halvane_bot.sync.linking import CLOCK_SKEW, PendingCode, filed_user, new_code
 from halvane_bot.sync.role_map import changes
 
@@ -44,6 +44,13 @@ def test_member_roles_from_a_membership_listing():
     only_role = {"groupMemberships": [{"path": "groups/9/memberships/a", "user": "users/42",
                                        "role": "groups/9/roles/55"}]}
     assert parse_member_roles(only_role, 9, 42) == {55}                            # older response shape
+
+
+def test_entry_value_object_or_json_string():
+    assert entry_value({"value": {"userId": 5, "at": 9}}) == {"userId": 5, "at": 9}
+    assert entry_value({"value": '{"userId": 5, "at": 9}'}) == {"userId": 5, "at": 9}
+    assert entry_value({"value": "not json"}) == "not json"
+    assert entry_value({}) is None
 
 
 def test_changes_only_touch_managed_roles():

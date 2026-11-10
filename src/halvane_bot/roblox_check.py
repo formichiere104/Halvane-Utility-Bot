@@ -24,8 +24,16 @@ HINTS = {
 }
 
 
+PROBE_KEY = "halvane-permission-probe-never-written"
+
+
 def _get(path: str, key: str) -> tuple[int, dict]:
-    req = urllib.request.Request(API + path, headers={"x-api-key": key, "User-Agent": "halvane-utility-bot"})
+    return _call("GET", path, key)
+
+
+def _call(method: str, path: str, key: str) -> tuple[int, dict]:
+    req = urllib.request.Request(API + path, method=method,
+                                 headers={"x-api-key": key, "User-Agent": "halvane-utility-bot"})
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             return resp.status, json.loads(resp.read() or b"{}")
@@ -76,13 +84,51 @@ def run_roblox_check(settings: Settings) -> int:
         print(f"FAIL  group roles: HTTP {status}: {HINTS.get(status, body)}")
 
     store = urllib.parse.quote(settings.link_store, safe="")
-    status, body = _get(f"/cloud/v2/universes/{settings.universe_id}/data-stores/{store}/entries?maxPageSize=1", key)
+    base = f"/cloud/v2/universes/{settings.universe_id}/data-stores/{store}/entries"
+    status, body = _get(f"{base}?maxPageSize=1", key)
     if status == 200:
-        print(f"ok    data store '{settings.link_store}' in universe {settings.universe_id}: readable "
-              f"({len(body.get('dataStoreEntries', []))} entry shown)")
+        print(f"ok    data store '{settings.link_store}': entries can be listed "
+              f"({len(body.get('dataStoreEntries', []))} shown)")
     else:
         failures += 1
-        print(f"FAIL  data store '{settings.link_store}': HTTP {status}: {HINTS.get(status, body)}")
+        print(f"FAIL  listing '{settings.link_store}': HTTP {status}: {HINTS.get(status, body)}")
+
+    # Read and delete are separate permissions from list. Probe both on a key that never exists:
+    # 404 means the key may do it; 401/403 means it may not. Nothing is read or deleted.
+    for method, what in (("GET", "read an entry"), ("DELETE", "delete an entry")):
+        status, body = _call(method, f"{base}/{PROBE_KEY}", key)
+        if status in (200, 404):
+            print(f"ok    the key may {what} in '{settings.link_store}'")
+        else:
+            failures += 1
+            print(f"FAIL  {what} in '{settings.link_store}': HTTP {status}: {HINTS.get(status, body)}"
+                  + ("  -> add this operation to the key's data store permissions" if status == 403 else ""))
 
     print("\n" + ("Open Cloud access works." if not failures else f"{failures} check(s) failed."))
     return 1 if failures else 0
+
+
+def run_link_check(settings: Settings, code: str) -> int:
+    """Read one LinkCodes entry exactly as the bot's poll does and print what Roblox answers. Read-only."""
+    import time
+
+    from .roblox.opencloud import entry_value
+
+    key = roblox_api_key()
+    store = urllib.parse.quote(settings.link_store, safe="")
+    code = code.strip().upper()
+    path = f"/cloud/v2/universes/{settings.universe_id}/data-stores/{store}/entries/{urllib.parse.quote(code)}"
+    status, body = _get(path, key)
+    print(f"GET {path}\nHTTP {status}")
+    if status == 404:
+        print("Nothing is filed under this code (or it was already used and deleted).")
+        return 1
+    if status != 200:
+        print(f"{HINTS.get(status, '')}\n{json.dumps(body)[:500]}")
+        return 1
+    value = entry_value(body)
+    print(f"value: {value!r}")
+    if isinstance(value, dict) and isinstance(value.get("at"), (int, float)):
+        print(f"filed {int(time.time() - value['at'])} s ago by this host's clock "
+              "(a large negative or very large number means the host clock is off)")
+    return 0

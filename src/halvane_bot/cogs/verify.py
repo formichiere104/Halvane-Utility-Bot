@@ -88,6 +88,8 @@ class VerifyCog(commands.Cog):
         code = new_code(s.link_alphabet, s.link_length, {p.code for p, _ in self.pending.values()})
         pending = PendingCode(code, uid, now, now + s.link_expires_minutes * 60)
         self.pending[uid] = (pending, interaction)  # a newer code replaces an older one
+        log.info("issued link code %s to %s (%d), expires in %d min", code, interaction.user, uid,
+                 s.link_expires_minutes)
         link = await self.bot.links.by_discord(uid)
         await interaction.response.send_message(
             embed=self._code_embed(pending, link.roblox_name if link else None), ephemeral=True)
@@ -113,13 +115,25 @@ class VerifyCog(commands.Cog):
             try:
                 value = await cloud.get_link_entry(p.code)
             except OpenCloudError as exc:
-                log.warning("reading link code failed: %s", exc)
+                if exc.status in (401, 403):
+                    # The key can't read entries: waiting won't help, so say so instead of going quiet.
+                    log.error("LinkCodes read refused: %s", exc)
+                    if self.pending.get(uid, (None,))[0] is p:
+                        del self.pending[uid]
+                    await self._edit(interaction, "Not linked",
+                                     "The Recruitment Office can't read the register right now. Staff have been "
+                                     "told; please try again later.", GREY)
+                    await self.bot.log_line(f"Linking failed: Roblox refused to read LinkCodes ({exc}). "
+                                            "Run `roblox-check` on the host.")
+                else:
+                    log.warning("reading link code failed (will retry): %s", exc)
                 continue
             if value is None:
                 continue
             roblox_id, reason = filed_user(value, p)
             if roblox_id is None:
-                log.info("ignoring a LinkCodes entry: %s", reason)
+                log.warning("ignoring LinkCodes entry %s: %s (value %r, code issued at %d)",
+                            p.code, reason, value, int(p.created_at))
                 continue
             if self.pending.get(uid, (None,))[0] is not p:
                 continue  # replaced by a newer code meanwhile
