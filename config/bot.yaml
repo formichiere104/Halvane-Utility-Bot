@@ -19,6 +19,15 @@ roblox:
   universe_id: 10775400484     # NPC System Testing (place 88799018873683)
 role_map_file: config/role_map.yaml
 
+# Account linking. Must match the game's Staff Register terminal
+# (NPC-Framework: ServerScriptService/NPC_Lab/StaffRegister/LinkCode.luau and LinkCodeStore.luau):
+# the game writes data store <data_store>, key = code, value = { userId, at } (at = os.time()).
+link_codes:
+  data_store: LinkCodes
+  alphabet: ABCDEFGHJKLMNPQRSTUVWXYZ23456789   # no 0/O, no 1/I
+  length: 6
+  expires_minutes: 10
+
 # Channel key where the bot logs what it published. Leave empty to disable.
 log_channel: server_logs
 

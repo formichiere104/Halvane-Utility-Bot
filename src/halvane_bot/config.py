@@ -29,6 +29,10 @@ class Settings:
     group_id: int = 0
     universe_id: int = 0
     role_map_file: Path | None = None
+    link_store: str = "LinkCodes"
+    link_alphabet: str = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    link_length: int = 6
+    link_expires_minutes: int = 10
 
 
 def project_root() -> Path:
@@ -65,6 +69,9 @@ def load_settings(root: Path | None = None) -> Settings:
         universe_id = int(roblox.get("universe_id") or 0)
     except ValueError as exc:
         raise ConfigError("config/bot.yaml: roblox ids must be numbers") from exc
+    link = raw.get("link_codes") or {}
+    if not isinstance(link, dict):
+        raise ConfigError("config/bot.yaml: 'link_codes' must be a mapping")
 
     return Settings(
         root=root,
@@ -79,6 +86,10 @@ def load_settings(root: Path | None = None) -> Settings:
         group_id=group_id,
         universe_id=universe_id,
         role_map_file=(root / raw["role_map_file"]) if raw.get("role_map_file") else None,
+        link_store=str(link.get("data_store") or "LinkCodes"),
+        link_alphabet=str(link.get("alphabet") or "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
+        link_length=int(link.get("length") or 6),
+        link_expires_minutes=int(link.get("expires_minutes") or 10),
     )
 
 

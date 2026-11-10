@@ -5,9 +5,9 @@ Plan: `design/unusual-shipping/community/personnel-office-bot-plan.html` in the 
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | Information messages (embeds) from YAML files, `/embeds` | **this release** |
-| 2 | Account linking with an in-game code, read-only rank sync | planned |
-| 3 | Bot owns the synced roles (Bloxlink binds removed) | planned |
+| 1 | Information messages (embeds) from YAML files, `/embeds` | done |
+| 2 | Account linking with an in-game code, rank sync (the bot owns the synced roles; Bloxlink skipped) | in progress: role map, link-code contract, game terminal, `roblox-check` |
+| 3 | merged into 2 (Bloxlink was never installed) | – |
 | 4 | Approvals into the game (`/approve`, `/demote`, `/certify`) | planned |
 | 5 | `/file`, `/reference`, game-side role assignment | planned |
 
@@ -75,6 +75,24 @@ reaches GitHub. There is one file per machine; nothing goes into system environm
   both will answer slash commands.
 - **VPS:** `~/Halvane-Utility-Bot/.env`. Add the line with `nano`, keep it `chmod 600`, then restart the
   bot's screen session so it reads the new value.
+
+### Checking the Roblox key
+
+```bash
+.venv/bin/python -m halvane_bot roblox-check
+```
+
+Read-only. Lists the Staff Register's roles (and checks every group role in `config/role_map.yaml` exists) and
+lists the `LinkCodes` data store. Run it on the VPS: the key is IP-restricted, so anywhere else it answers 401.
+
+## Account linking contract (phase 2)
+
+The game's Staff Register terminal (NPC Lab, `NPC_Lab/StaffRegister` in the NPC-Framework repo) and this bot
+share one format, set under `link_codes:` in `config/bot.yaml` and pinned by `tests/test_link_codes.py`:
+
+- Codes are 6 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no 0/O, no 1/I). The bot generates them.
+- The game writes data store `LinkCodes`, key = the code, value = `{ "userId": <number>, "at": <unix seconds> }`.
+- The bot reads the entry, links the accounts if it is younger than `expires_minutes`, then deletes it.
 
 ## Local development (Windows)
 

@@ -42,9 +42,9 @@ roles:
   dispatch_command: "1569677327527579709"  # Dispatch · Command
   dispatch_officer: "1569677329050116286"  # Dispatch · Officer
   dispatch_nco: "1569677330735956028"  # Dispatch · NCO
-  training_command: "1569677332875313232"  # Training · Command
-  training_officer: "1569677334368362537"  # Training · Officer
-  training_nco: "1569677335563870208"  # Training · NCO
+  training_command: "1569677332875313232"  # Instructor · Command
+  training_officer: "1569677334368362537"  # Instructor · Officer
+  training_nco: "1569677335563870208"  # Instructor · NCO
   provost_command: "1569677336784281610"  # Provost · Command
   provost_officer: "1569677338516394054"  # Provost · Officer
   provost_nco: "1569677340022276149"  # Provost · NCO
