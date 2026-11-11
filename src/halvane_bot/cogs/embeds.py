@@ -11,6 +11,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .. import ui
 from ..embeds.loader import EmbedSet, EmbedSpecError, load_all
 from ..embeds.publisher import NO_PINGS, PublishError, adopt, message_view, publish
 from ..embeds.render import Rendered, RenderError, render_set
@@ -56,8 +57,6 @@ class EmbedsCog(commands.GroupCog, group_name="embeds",
             return []
         return [app_commands.Choice(name=k, value=k) for k in keys if current.lower() in k][:25]
 
-    async def _log(self, text: str) -> None:
-        await self.bot.log_line(text)
 
     # ---- access ------------------------------------------------------------------------------------
 
@@ -103,8 +102,8 @@ class EmbedsCog(commands.GroupCog, group_name="embeds",
                     status = f"error: {exc}"
             note = f" · {es.note}" if es and es.note else ""
             lines.append(f"**{key}** → {where} · {status}{note}")
-        await interaction.response.send_message("\n".join(lines) or "No embed files.", ephemeral=True,
-                                                allowed_mentions=NO_PINGS)
+        await ui.respond(interaction, ui.card("Managed messages", "\n".join(lines) or "No embed files.",
+                                              actor=interaction.user), private=True)
 
     @app_commands.command(name="preview", description="Show a message privately, exactly as it would be posted.")
     @app_commands.describe(key="Embed file name")
@@ -131,9 +130,11 @@ class EmbedsCog(commands.GroupCog, group_name="embeds",
             report = await publish(self.bot, self.bot.store, rendered, prune=prune)
         except PublishError as exc:
             raise UserFacingError(f"`{key}` was not published: {exc}") from None
-        await interaction.followup.send(f"Published **{key}** in <#{report.channel_id}>: {report.summary()}.",
-                                        ephemeral=True)
-        await self._log(f"`/embeds publish {key}` by {interaction.user.mention}: {report.summary()}.")
+        where = f"<#{report.channel_id}>"
+        await ui.respond(interaction, ui.card("Published", f"**{key}** in {where}: {report.summary()}.",
+                                              color=ui.BLUE, actor=interaction.user), private=True)
+        await self.bot.log_event("Message published", f"**{key}** in {where}: {report.summary()}.",
+                                 interaction=interaction)
 
     @app_commands.command(name="adopt", description="Take over messages this bot already posted.")
     @app_commands.describe(key="Embed file name", message_ids="Message ids in display order, separated by commas")
@@ -150,9 +151,10 @@ class EmbedsCog(commands.GroupCog, group_name="embeds",
             await adopt(self.bot, self.bot.store, key, rendered.channel_id, ids)
         except PublishError as exc:
             raise UserFacingError(f"Couldn't adopt: {exc}") from None
-        await interaction.followup.send(
-            f"Adopted {len(ids)} message(s) for **{key}**. `/embeds publish {key}` now edits them.", ephemeral=True)
-        await self._log(f"`/embeds adopt {key}` by {interaction.user.mention}: {len(ids)} message(s).")
+        await ui.respond(interaction, ui.card(
+            "Adopted", f"{len(ids)} message(s) for **{key}**. `/embeds publish {key}` now edits them.",
+            color=ui.BLUE, actor=interaction.user), private=True)
+        await self.bot.log_event("Messages adopted", f"{len(ids)} message(s) for **{key}**.", interaction=interaction)
 
     # ---- autocomplete for every command's `key` -------------------------------------------------------
 

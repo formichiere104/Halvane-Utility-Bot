@@ -1,5 +1,8 @@
 """/approve, /demote, /certify: the Directorate records a decision; ApprovalService carries it everywhere.
 
+Replies are public in the channel the command was run in. Approvals and certifications are also announced in
+#personnel-notices; demotions are not. Every decision is logged in #server-logs.
+
 Quota is checked by staff in the ticket for now: the game has no Compliance or Personnel File yet. When it
 does, the bot will refuse an approval whose quota isn't met.
 """
@@ -7,15 +10,16 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .. import ui
 from ..approvals.ledger import ApprovalError, Ledger, approve, certify, demote
-from ..approvals.service import ApprovalService
-from ..embeds.publisher import NO_PINGS
+from ..approvals.service import ApplyResult, ApprovalService
 from ..ids import load_ids
 from .common import UserFacingError, has_any_role_key, report_error
 
@@ -24,7 +28,26 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-STAFF = discord.Permissions(manage_guild=True)
+
+@dataclass(frozen=True)
+class Notice:
+    """The cheerful line for #personnel-notices."""
+    title: str
+    line: str
+
+
+def promotion_notice(member: str, step: str, division: str) -> Notice:
+    return Notice("🎉 Promotion", f"{member} has been promoted to **{step}** of **{division}**!")
+
+
+def posting_notice(member: str, division: str) -> Notice:
+    return Notice("📋 New Posting", f"{member} has joined **{division}**! Welcome aboard.")
+
+
+def certification_notice(member: str, certification: str) -> Notice:
+    if certification.endswith(("Certified", "Qualified")):
+        return Notice("🎓 Certification", f"{member} is now **{certification}**!")
+    return Notice("🎓 Certification", f"{member} is now certified in **{certification}**!")
 
 
 class ApprovalsCog(commands.Cog):
@@ -50,36 +73,46 @@ class ApprovalsCog(commands.Cog):
         return [app_commands.Choice(name=label, value=key) for key, label in items
                 if cur in label.lower() or cur in key][:25]
 
-    async def _notice(self, text: str) -> None:
+    async def _announce(self, notice: Notice, member: discord.Member, staff: discord.Member) -> None:
         try:
-            channel = self.bot.get_channel(load_ids(self.bot.settings.ids_file).channel(self.service.cfg.notices_channel))
+            ids = load_ids(self.bot.settings.ids_file)
+            channel = self.bot.get_channel(ids.channel(self.service.cfg.notices_channel))
             if isinstance(channel, discord.abc.Messageable):
-                await channel.send(text, allowed_mentions=NO_PINGS)
+                embed = ui.card(notice.title, notice.line, color=ui.VIOLET,
+                                fields=[("Approved by", staff.mention, True)],
+                                thumbnail=member.display_avatar.url)
+                await channel.send(embed=embed, allowed_mentions=ui.NO_PINGS)
         except Exception:
             log.exception("could not post the personnel notice")
 
+    def _reply_fields(self, result: ApplyResult) -> list[ui.Field]:
+        fields: list[ui.Field] = []
+        tier = " ".join([f"+{r.mention}" for r in result.tier_added] + [f"-{r.mention}" for r in result.tier_removed])
+        if tier:
+            fields.append(("Division tier", tier, False))
+        if result.sync is not None:
+            fields += ui.sync_fields(result.sync)
+        fields += [("Note", w, False) for w in result.warnings]
+        return fields
+
     async def _run(self, interaction: discord.Interaction, member: discord.Member,
                    mutate: Callable[[Ledger], Ledger], division: str | None,
-                   done: str, notice: str | None) -> None:
+                   title: str, done: str, notice: Notice | None) -> None:
         staff = self._require_manager(interaction)
         if member.bot:
             raise UserFacingError("Bots have no Personnel File.")
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(thinking=True)  # public: the reply shows in this channel
         try:
             result = await self.service.apply(member, mutate, division)
         except ApprovalError as exc:
             raise UserFacingError(str(exc)) from None
-        lines = [done]
-        if result.tier_added or result.tier_removed:
-            lines.append("Tier: " + " ".join([f"+{r.mention}" for r in result.tier_added]
-                                             + [f"-{r.mention}" for r in result.tier_removed]))
-        if result.sync is not None:
-            lines.append(f"Synced roles: {result.sync.summary()}")
-        lines += [f"Note: {w}" for w in result.warnings]
-        await interaction.followup.send("\n".join(lines), ephemeral=True, allowed_mentions=NO_PINGS)
+        fields = self._reply_fields(result)
+        await ui.respond(interaction, ui.card(title, done, color=ui.INDIGO, actor=staff, fields=fields,
+                                              thumbnail=member.display_avatar.url))
         if notice:
-            await self._notice(notice)
-        await self.bot.log_line(f"{staff.mention}: {done}")
+            await self._announce(notice, member, staff)
+        await self.bot.log_event(title, done, interaction=interaction,
+                                 fields=[("Member", member.mention, True), *fields])
 
     # ---- commands ---------------------------------------------------------------------------------
 
@@ -96,11 +129,14 @@ class ApprovalsCog(commands.Cog):
         d = cfg.divisions[division]
         by = f"discord:{interaction.user.id}"
         if rank == "posting":
-            done = f"{member.mention} joins **{d.label}**."
+            title, done = "Posting approved", f"{member.mention} joins **{d.label}**."
+            notice = posting_notice(member.mention, d.name)
         else:
-            done = f"{member.mention} is approved as **{cfg.steps[rank].label}** in **{d.label}**."
+            step = cfg.steps[rank].label
+            title, done = "Promotion approved", f"{member.mention} is approved as **{step}** in **{d.label}**."
+            notice = promotion_notice(member.mention, step, d.name)
         await self._run(interaction, member, lambda led: approve(led, cfg, division, rank, by, time.time()),
-                        None if rank == "posting" else division, done, notice=done)
+                        None if rank == "posting" else division, title, done, notice)
 
     @app_commands.command(name="demote", description="Directorate: lower or remove a leadership rank.")
     @app_commands.guild_only()
@@ -114,10 +150,12 @@ class ApprovalsCog(commands.Cog):
             raise UserFacingError("Pick the division and rank from the lists.")
         d = cfg.divisions[division]
         by = f"discord:{interaction.user.id}"
-        label = cfg.steps[target].label if target else "no leadership rank"
-        done = f"{member.mention} is now **{label}** in **{d.label}**."
+        if target:
+            done = f"{member.mention} is now **{cfg.steps[target].label}** in **{d.label}**."
+        else:
+            done = f"{member.mention} no longer holds a leadership rank in **{d.label}**."
         await self._run(interaction, member, lambda led: demote(led, cfg, division, target, by, time.time()),
-                        division, done, notice=None)  # demotions are not announced
+                        division, "Rank changed", done, notice=None)  # demotions are not announced
 
     @app_commands.command(name="certify", description="Directorate: record a certification.")
     @app_commands.guild_only()
@@ -128,9 +166,10 @@ class ApprovalsCog(commands.Cog):
         if certification not in cfg.certifications:
             raise UserFacingError("Pick the certification from the list.")
         by = f"discord:{interaction.user.id}"
-        done = f"{member.mention} is certified: **{cfg.certifications[certification].label}**."
+        label = cfg.certifications[certification].label
+        done = f"{member.mention} is certified: **{label}**."
         await self._run(interaction, member, lambda led: certify(led, cfg, certification, by, time.time()),
-                        None, done, notice=done)
+                        None, "Certification recorded", done, certification_notice(member.mention, label))
 
     # ---- autocomplete ----------------------------------------------------------------------------------
 

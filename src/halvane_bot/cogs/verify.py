@@ -14,8 +14,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from .. import ui
 from ..embeds.actions import VERIFY_CUSTOM_ID
-from ..embeds.publisher import NO_PINGS
 from ..roblox.opencloud import OpenCloudError
 from ..sync.linking import PendingCode, filed_user, new_code
 from .common import UserFacingError, has_any_role_key, report_error
@@ -25,9 +25,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-BLUE = 0x4F8FD6
-GREEN = 0x3E9E6E
-GREY = 0x7A8288
 CODES_PER_WINDOW = 3
 CODE_WINDOW = 600  # seconds
 
@@ -71,18 +68,18 @@ class VerifyCog(commands.Cog):
                 f"The code expires <t:{int(p.expires_at)}:R>.")
         if current:
             text += f"\n\nYou are linked to **{current}** now; filing this code switches the link."
-        return discord.Embed(title="Staff Register", description=text, color=BLUE)
+        return ui.card("Staff Register", text, color=ui.SKY)
 
     async def start_verification(self, interaction: discord.Interaction) -> None:
         if self.bot.cloud is None:
-            await interaction.response.send_message("Verification is not available right now.", ephemeral=True)
+            await ui.respond(interaction, ui.problem("Verification is not available right now."), private=True)
             return
         uid = interaction.user.id
         now = time.time()
         recent = [t for t in self.attempts.get(uid, []) if now - t < CODE_WINDOW]
         if len(recent) >= CODES_PER_WINDOW:
-            await interaction.response.send_message(
-                "You have asked for three codes in ten minutes. Please wait before asking again.", ephemeral=True)
+            await ui.respond(interaction, ui.problem(
+                "You have asked for three codes in ten minutes. Please wait before asking again."), private=True)
             return
         self.attempts[uid] = recent + [now]
         s = self.bot.settings
@@ -92,12 +89,13 @@ class VerifyCog(commands.Cog):
         log.info("issued link code %s to %s (%d), expires in %d min", code, interaction.user, uid,
                  s.link_expires_minutes)
         link = await self.bot.links.by_discord(uid)
-        await interaction.response.send_message(
-            embed=self._code_embed(pending, link.roblox_name if link else None), ephemeral=True)
+        # Always private: anyone who saw the code could file it with their own Roblox account.
+        await ui.respond(interaction, self._code_embed(pending, link.roblox_name if link else None), private=True)
 
-    async def _edit(self, interaction: discord.Interaction, title: str, text: str, color: int) -> None:
+    async def _edit(self, interaction: discord.Interaction, title: str, text: str, color: int,
+                    fields: list[ui.Field] | None = None) -> None:
         try:
-            await interaction.edit_original_response(embed=discord.Embed(title=title, description=text, color=color))
+            await interaction.edit_original_response(embed=ui.card(title, text, color=color, fields=fields or []))
         except discord.HTTPException:
             pass  # the private message is gone or its token expired; nothing else to do
 
@@ -121,7 +119,7 @@ class VerifyCog(commands.Cog):
             if self.pending.get(uid, (None,))[0] is p:
                 del self.pending[uid]
             log.info("link code %s expired without being filed", p.code)
-            await self._edit(interaction, "Code expired", "That code expired. Run `/verify` for a new one.", GREY)
+            await self._edit(interaction, "Code expired", "That code expired. Run `/verify` for a new one.", ui.DUSK)
             return
         checks = self.checks[p.code] = self.checks.get(p.code, 0) + 1
         try:
@@ -134,9 +132,9 @@ class VerifyCog(commands.Cog):
                     del self.pending[uid]
                 await self._edit(interaction, "Not linked",
                                  "The Recruitment Office can't read the register right now. Staff have been "
-                                 "told; please try again later.", GREY)
-                await self.bot.log_line(f"Linking failed: Roblox refused to read LinkCodes ({exc}). "
-                                        "Run `roblox-check` on the host.")
+                                 "told; please try again later.", ui.DUSK)
+                await self.bot.log_event("Linking failed", f"Roblox refused to read LinkCodes ({exc}). "
+                                         "Run `roblox-check` on the host.", interaction=interaction, color=ui.DUSK)
             else:
                 log.warning("reading link code %s failed (will retry): %s", p.code, exc)
             return
@@ -178,11 +176,15 @@ class VerifyCog(commands.Cog):
             await sync.sync_member(old)
 
         name = f"**{username}**" + (f" ({display})" if display != username else "")
-        text = f"Linked to {name}. Your roles: {result.summary() if result else 'they update when you rejoin the server.'}"
-        await self._edit(interaction, "Linked", text, GREEN)
+        if result:
+            await self._edit(interaction, "Linked", f"Linked to {name}.", ui.BLUE, ui.sync_fields(result))
+        else:
+            await self._edit(interaction, "Linked", f"Linked to {name}. Your roles update when you rejoin the server.",
+                             ui.BLUE)
         who = member.mention if member else f"<@{p.discord_id}>"
-        await self.bot.log_line(f"{who} linked Roblox **{username}** (`{roblox_id}`)"
-                                + (f", moved from <@{moved_from}>" if moved_from else "") + ".")
+        await self.bot.log_event(
+            "Account linked", f"{who} linked Roblox {name} (`{roblox_id}`).", interaction=interaction,
+            fields=[("Moved from", f"<@{moved_from}>", True)] if moved_from else [])
 
     # ---- member commands --------------------------------------------------------------------------
 
@@ -198,14 +200,18 @@ class VerifyCog(commands.Cog):
         member = interaction.user
         if not isinstance(member, discord.Member) or self.bot.role_sync is None:
             raise UserFacingError("Use this in the server.")
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(thinking=True)
         result = await self.bot.role_sync.sync_member(member, set_nickname=True, force_ledger=True)
-        head = (f"Linked to **{result.link.roblox_name}**." if result.link
-                else "You are not linked yet: use `/verify` or the Verify button in #verify.")
-        if result.link and result.in_group is False:
-            head += " You are not in the Staff Register (our Roblox group) yet."
-        await interaction.followup.send(f"{head}\nRoles: {result.summary()}", ephemeral=True,
-                                        allowed_mentions=NO_PINGS)
+        if result.link is None:
+            await ui.respond(interaction, ui.card(
+                "Not linked yet", f"{member.mention}, use `/verify` or the Verify button in #verify to link your "
+                "Roblox account.", actor=member))
+            return
+        head = f"{member.mention} is linked to **{result.link.roblox_name}**."
+        if result.in_group is False:
+            head += " They are not in the Staff Register (our Roblox group) yet."
+        await ui.respond(interaction, ui.card("Roles updated", head, color=ui.BLUE, actor=member,
+                                              fields=ui.sync_fields(result)))
 
     @app_commands.command(name="unlink", description="Remove the link to your Roblox account and its roles.")
     @app_commands.guild_only()
@@ -215,11 +221,12 @@ class VerifyCog(commands.Cog):
             raise UserFacingError("Use this in the server.")
         if not await self.bot.links.unlink(member.id):
             raise UserFacingError("You are not linked to a Roblox account.")
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(thinking=True)
         result = await self.bot.role_sync.sync_member(member)
-        await interaction.followup.send(f"Unlinked. Roles: {result.summary()}", ephemeral=True,
-                                        allowed_mentions=NO_PINGS)
-        await self.bot.log_line(f"{member.mention} unlinked their Roblox account.")
+        await ui.respond(interaction, ui.card("Account unlinked", f"{member.mention} unlinked their Roblox account.",
+                                              actor=member, fields=ui.sync_fields(result)))
+        await self.bot.log_event("Account unlinked", f"{member.mention} unlinked their Roblox account.",
+                                 interaction=interaction)
 
     # ---- staff ----------------------------------------------------------------------------------------
 
@@ -236,21 +243,26 @@ class VerifyCog(commands.Cog):
     @app_commands.describe(member="Who to sync")
     async def sync_member(self, interaction: discord.Interaction, member: discord.Member) -> None:
         self._require_manager(interaction)
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(thinking=True)
         assert self.bot.role_sync is not None
         result = await self.bot.role_sync.sync_member(member, set_nickname=True, force_ledger=True)
         linked = f"linked to **{result.link.roblox_name}** (`{result.link.roblox_id}`)" if result.link else "not linked"
-        await interaction.followup.send(f"{member.mention} is {linked}. Roles: {result.summary()}",
-                                        ephemeral=True, allowed_mentions=NO_PINGS)
+        text = f"{member.mention} is {linked}."
+        await ui.respond(interaction, ui.card("Member synced", text, color=ui.INDIGO, actor=interaction.user,
+                                              fields=ui.sync_fields(result)))
+        await self.bot.log_event("Member synced", text, interaction=interaction, fields=ui.sync_fields(result))
 
     @sync_group.command(name="all", description="Sync every linked member now (also reloads the role map).")
     async def sync_all(self, interaction: discord.Interaction) -> None:
         self._require_manager(interaction)
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(thinking=True)
         assert self.bot.role_sync is not None
         checked, changed, errors = await self.bot.role_sync.sweep()
-        await interaction.followup.send(
-            f"Synced {checked} linked member(s): {changed} changed, {errors} could not be synced.", ephemeral=True)
+        counts: list[ui.Field] = [("Checked", str(checked), True), ("Changed", str(changed), True),
+                                  ("Could not sync", str(errors), True)]
+        await ui.respond(interaction, ui.card("Everyone synced", "Every linked member was synced from the Roblox "
+                                              "group.", color=ui.INDIGO, actor=interaction.user, fields=counts))
+        await self.bot.log_event("Everyone synced", None, interaction=interaction, fields=counts)
 
     # ---- events and the sweep ------------------------------------------------------------------------
 

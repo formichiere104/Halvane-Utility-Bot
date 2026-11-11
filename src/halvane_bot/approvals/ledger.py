@@ -42,6 +42,11 @@ class Division:
     label: str
     posting_group_role: int | None
     tier_roles: dict[str, int]  # tier -> Discord role id
+    called: str = ""            # how notices name it ("Instructors"); empty = label
+
+    @property
+    def name(self) -> str:
+        return self.called or self.label
 
 
 @dataclass(frozen=True)
@@ -87,7 +92,7 @@ def load_approvals(path: Path, ids: IdRegistry) -> ApprovalConfig:
                 raise ApprovalConfigError(f"division {key}: tiers must be exactly {TIERS}")
             divisions[key] = Division(key, str(d["label"]),
                                       int(d["posting_group_role"]) if d.get("posting_group_role") else None,
-                                      {t: ids.role(k) for t, k in tiers.items()})
+                                      {t: ids.role(k) for t, k in tiers.items()}, str(d.get("called") or ""))
         steps = {}
         for i, s in enumerate(raw.get("steps") or []):
             if s.get("tier") not in TIERS:

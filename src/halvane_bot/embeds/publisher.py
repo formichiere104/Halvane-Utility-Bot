@@ -73,15 +73,17 @@ class ActionButton(discord.ui.Button):
         handlers = getattr(interaction.client, "action_handlers", {})
         handler = handlers.get(self.custom_id)
         if handler is None:
-            await interaction.response.send_message("This button is not available right now.", ephemeral=True)
+            from .. import ui
+            await ui.respond(interaction, ui.problem("This button is not available right now."), private=True)
             return
         try:
             await handler(interaction)
         except Exception:
             log.exception("button %s failed", self.custom_id)
             if not interaction.response.is_done():
-                await interaction.response.send_message("Something went wrong; the details are in the bot's log.",
-                                                        ephemeral=True)
+                from .. import ui
+                await ui.respond(interaction, ui.problem("Something went wrong; the details are in the bot's log."),
+                                 private=True)
 
 
 def message_view(message: dict) -> discord.ui.View | None:

@@ -6,6 +6,7 @@ import logging
 import discord
 from discord import app_commands
 
+from .. import ui
 from ..ids import load_ids
 
 log = logging.getLogger(__name__)
@@ -25,7 +26,8 @@ def has_any_role_key(member: discord.Member, keys: tuple[str, ...], ids_file) ->
 
 
 async def report_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
-    """Reply privately with a clear message; log anything unexpected."""
+    """Reply with a clear message; log anything unexpected. Private, unless the command had already started
+    a public reply (then the refusal takes its place)."""
     if isinstance(error, app_commands.CommandInvokeError):
         error = error.original  # errors raised inside a command callback arrive wrapped
     if isinstance(error, UserFacingError):
@@ -35,7 +37,4 @@ async def report_error(interaction: discord.Interaction, error: app_commands.App
     else:
         log.exception("command failed", exc_info=error)
         text = "Something went wrong; the details are in the bot's log."
-    if interaction.response.is_done():
-        await interaction.followup.send(text, ephemeral=True)
-    else:
-        await interaction.response.send_message(text, ephemeral=True)
+    await ui.respond(interaction, ui.problem(text), private=True)

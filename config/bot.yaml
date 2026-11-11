@@ -39,8 +39,11 @@ sync_managers:
 sync_interval_minutes: 15        # sweep of every linked member
 nickname_format: "{username}"    # Roblox username as the Discord nickname; empty = leave nicknames alone
 
-# Channel key where the bot logs what it published. Leave empty to disable.
+# Channel key where the bot logs staff actions and links (as embeds: who, which channel, when). Empty = off.
 log_channel: server_logs
+
+# Footer of every embed the bot sends: "<brand> • Run by <name>".
+brand: Halvane Personnel Office
 
 # Links used in embeds as {link:key}. An empty link blocks publishing until it is filled in.
 links:

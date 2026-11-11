@@ -11,6 +11,22 @@ Plan: `design/unusual-shipping/community/personnel-office-bot-plan.html` in the 
 | 4 | Approvals into the game (`/approve`, `/demote`, `/certify`) | **built**: ledger, group roles, tiers, live servers, notices |
 | 5 | `/file`, `/reference`, game-side role assignment | planned |
 
+## How the bot replies
+
+Everything the bot says is an embed in one palette, from light blue (information) through blue (done) and
+blue-purple (staff actions, the log) to purple (personnel notices); refusals are a muted purple. The footer reads
+`<brand> • Run by <name>` with that person's avatar and the time (`brand` in `config/bot.yaml`). The style lives
+in `src/halvane_bot/ui.py`.
+
+| Who sees the reply | Commands |
+|---|---|
+| Everyone in the channel | `/update`, `/unlink`, `/sync member`, `/sync all`, `/approve`, `/demote`, `/certify` |
+| Only the person who ran it | `/embeds ...`; `/verify` and the Verify button (the code must stay secret: anyone who saw it could file it with their own Roblox account) |
+| Only the person who ran it | Refusals before a command starts (no permission, cooldown, a wrong choice). A refusal after a public command started (for example "Already Team Lead") takes the place of its reply, so it is public too. |
+
+`#server-logs` gets an embed for every staff action and link: what happened, the command with its options, who
+ran it, in which channel and when, and the result.
+
 ## What phase 1 does
 
 The welcome, rules, ranks and how-to pages live as YAML files in `embeds/`. The bot posts them and, on later
@@ -25,7 +41,7 @@ as keys (`{role:station_chief}`, `{channel:events}`) and become real mentions. M
 | `/embeds adopt key message_ids` | Takes over messages **this bot** already posted, so publish edits them. |
 
 Only the server owner and the roles in `embed_managers` (`config/bot.yaml`) can use them; the group is also
-hidden from members without Manage Server. Every publish is logged in `#server-logs`.
+hidden from members without Manage Server. Replies are private. Every publish and adopt is logged in `#server-logs`.
 
 ## Layout
 
@@ -160,7 +176,13 @@ Each command, in order, and nothing is written if a step before the write fails:
    once; otherwise the game reads the ledger on the next join.
 5. Sets the division's Discord tier role (NCO / Officer / Command).
 6. Syncs the member's Discord roles from the group, as `/update` does.
-7. Posts the notice in #personnel-notices (approvals and certifications) and a line in #server-logs.
+7. Replies in the channel (public), posts the notice in #personnel-notices (approvals and certifications) and
+   logs the decision in #server-logs.
+
+Notices are purple embeds with the member's avatar and who approved it, worded to celebrate: "@Dude has been
+promoted to **Team Lead** of **Dispatch**!", "@Dude has joined **Dispatch**! Welcome aboard.", "@Dude is now
+**Registry Certified**!". A division's `called` in `approvals.yaml` sets how notices name it (Training:
+"Instructors"). Mentions in embeds never ping.
 
 Quota is still checked by staff in the ticket: the game has no Compliance or Personnel File yet.
 

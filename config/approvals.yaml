@@ -8,13 +8,14 @@ message_topic: personnel          # MessagingService topic live servers subscrib
 notices_channel: personnel_notices
 
 # Divisions that have a leadership ladder. Hidden divisions are hand-assigned and not listed.
+# `called` (optional) is how notices name the division: "promoted to Team Lead of <called>!" (default: label).
 divisions:
   packing:             {label: Packing,             posting_group_role: null,      tiers: {nco: packing_nco, officer: packing_officer, command: packing_command}}
   facilities:          {label: Facilities,          posting_group_role: null,      tiers: {nco: facilities_nco, officer: facilities_officer, command: facilities_command}}
   forklift_operations: {label: Forklift Operations, posting_group_role: 915914176, tiers: {nco: forklift_nco, officer: forklift_officer, command: forklift_command}}
   provost:             {label: Provost,             posting_group_role: 915818129, tiers: {nco: provost_nco, officer: provost_officer, command: provost_command}}
   dispatch:            {label: Dispatch,            posting_group_role: 916350119, tiers: {nco: dispatch_nco, officer: dispatch_officer, command: dispatch_command}}
-  training:            {label: Instructor,          posting_group_role: 903950001, tiers: {nco: training_nco, officer: training_officer, command: training_command}}
+  training:            {label: Instructor,          posting_group_role: 903950001, called: Instructors, tiers: {nco: training_nco, officer: training_officer, command: training_command}}
 
 # The leadership ladder, lowest first (Game Plan section 03, steps 6 to 11). The grade group role is the member's
 # highest step in any division; the tier is set per division.

@@ -37,6 +37,7 @@ class Settings:
     sync_interval_minutes: int = 15
     nickname_format: str = "{username}"
     ids_ignore_channels: tuple[str, ...] = ()
+    brand: str = "Halvane Personnel Office"
 
 
 def project_root() -> Path:
@@ -98,6 +99,7 @@ def load_settings(root: Path | None = None) -> Settings:
         sync_interval_minutes=max(1, int(raw.get("sync_interval_minutes") or 15)),
         nickname_format=str(raw.get("nickname_format") or ""),
         ids_ignore_channels=tuple(str(p) for p in raw.get("ids_ignore_channels") or ()),
+        brand=str(raw.get("brand") or "Halvane Personnel Office"),
     )
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Iterable
 
 import discord
 from discord.ext import commands
@@ -11,7 +11,8 @@ from discord.ext import commands
 from .approvals.service import ApprovalService
 from .config import Settings
 from .embeds.actions import ACTIONS
-from .embeds.publisher import NO_PINGS, persistent_view
+from . import ui
+from .embeds.publisher import persistent_view
 from .ids import load_ids
 from .roblox.opencloud import OpenCloud
 from .store import Database, EmbedStore, LinkStore
@@ -32,6 +33,7 @@ class HalvaneBot(commands.Bot):
             help_command=None,
         )
         self.settings = settings
+        ui.configure(settings.brand)
         self.db = Database(settings.database)
         self.store = EmbedStore(self.db)
         self.links = LinkStore(self.db)
@@ -70,15 +72,23 @@ class HalvaneBot(commands.Bot):
     async def on_ready(self) -> None:
         log.info("logged in as %s (%s)", self.user, getattr(self.user, "id", "?"))
 
-    async def log_line(self, text: str) -> None:
-        """Write one line to the configured log channel. Never raises."""
+    async def log_event(self, title: str, description: str | None = None, *,
+                        interaction: discord.Interaction | None = None,
+                        actor: discord.abc.User | None = None,
+                        fields: Iterable[ui.Field] = (), color: int = ui.INDIGO) -> None:
+        """Post one entry to the log channel as an embed: what happened, the command, who ran it, in which
+        channel and when, then `fields`. Never raises."""
         key = self.settings.log_channel
         if not key:
             return
+        if actor is None and interaction is not None:
+            actor = interaction.user
         try:
             channel = self.get_channel(load_ids(self.settings.ids_file).channel(key))
             if isinstance(channel, discord.abc.Messageable):
-                await channel.send(text, allowed_mentions=NO_PINGS)
+                embed = ui.card(title, description, color=color, actor=actor,
+                                fields=[*ui.log_fields(interaction, actor), *fields])
+                await channel.send(embed=embed, allowed_mentions=ui.NO_PINGS)
         except Exception:
             log.exception("could not write to the log channel")
 
